@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Syed Danish Ali</title>
+  <meta name="description" content="Marine environment & cryosphere modelling, climate dynamics, and data science." />
+  <meta property="og:title" content="Danish Ali — Portfolio" />
+  <meta property="og:description" content="Marine environment & cryosphere, machine learning, data visualization." />
+  <meta property="og:type" content="website" />
+  <meta name="color-scheme" content="light dark" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    /* ===== Design tokens ===== */
+:root{
+  --bg:#0b0c10; --panel:#121419; --card:#171a21; --text:#e8eef6; --muted:#9fb3c8;
+  --brand:#4cc9f0; --accent:#80ffdb; --line:#232633;
+  --bg-light:#ffffff; --panel-light:#f7f8fb; --card-light:#ffffff; --text-light:#0e1726;
+  --muted-light:#4b5563; --line-light:#e5e7eb; --brand-light:#2563eb; --accent-light:#06b6d4;
+}
+@media (prefers-color-scheme:light){
+  :root{
+    --bg:var(--bg-light); --panel:var(--panel-light); --card:var(--card-light);
+    --text:var(--text-light); --muted:var(--muted-light); --line:var(--line-light);
+    --brand:var(--brand-light); --accent:var(--accent-light);
+  }
+}
+
+/* ===== Base ===== */
+*{ box-sizing:border-box }
+html,body{ margin:0; padding:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text); }
+a{ color:var(--brand); text-decoration:none } a:hover{ text-decoration:underline }
+body{ font-size:17px; } /* gentle bump */
+
+/* Page container */
+.container{ max-width:1280px; margin-inline:auto; padding:56px 40px; }
+
+/* Sections & grids */
+section{ padding:56px 0; }
+.grid{ display:grid; gap:32px; }
+.col-12{ grid-column:span 12; }
+
+
+/* Cards */
+.card{
+  background:var(--card); border:1px solid var(--line);
+  border-radius:20px; padding:34px 36px; box-shadow:0 6px 20px rgba(0,0,0,.08);
+}
+h2{ font-size:24px; margin:0 0 14px; }
+h3{ font-size:19px; margin:0 0 10px; }
+p{ margin:0 0 14px; }
+ul{ margin:0; padding-left:18px; }
+.list-plain{ list-style:none; padding:0 }
+.list-plain li{ padding:10px 0; border-bottom:1px dashed var(--line) }
+
+/* Buttons */
+.btn{
+  display:inline-flex; align-items:center; gap:10px; background:var(--brand); color:#fff;
+  padding:10px 16px; border-radius:12px; border:1px solid color-mix(in hsl, var(--brand) 60%, black);
+  box-shadow:0 10px 20px rgba(0,0,0,.12); font-weight:600; transition:filter .2s ease;
+}
+.btn:hover{ filter:brightness(1.05); text-decoration:none; }
+.btn.ghost{ background:transparent; color:var(--text); border:1px solid var(--line) }
+.pill-links{ display:flex; gap:10px; flex-wrap:wrap; justify-content:left }
+
+/* Footer */
+footer{ margin-top:40px; padding:24px 0; border-top:1px solid var(--line); color:var(--muted); text-align:center }
+
+/* ===== Hero cover ===== */
+header.hero-cover{ position:relative; background:transparent; border:0; margin:0; }
+.hero-cover{
+  width:100%; min-height:80vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; background-image: url("./Images/bg3.jpg"); background-position: center; background-size: cover; background-repeat: no-repeat; overflow:hidden; margin-bottom:64px;
+}
+.hero-cover::before{
+  content:""; position:absolute; inset:0; background:inherit; filter:blur(6px) brightness(.95); transform:scale(1.04); z-index:-2;
+}
+.hero-cover::after{
+  content:""; position:absolute; inset:0; background:rgba(0,0,0,.14); z-index:-1;
+}
+.site-title{
+  margin:0; font-weight:800; font-size:clamp(52px,8vw,104px); line-height:1.05;
+  color:#fff; text-shadow:0 10px 32px rgba(0,0,0,.45); z-index:1;
+}
+header .brand{ display:none; } /* hide any legacy brand bar */
+
+/* Hero top bar (links + buttons) */
+.hero-topbar{
+  position:absolute; top:14px; left:50%; transform:translateX(-50%);
+  width:min(1280px,92%); display:flex; align-items:center; justify-content:space-between; gap:16px; z-index:2;
+}
+.hero-topbar .links{ display:flex; gap:18px; flex-wrap:wrap; }
+.hero-topbar .links a{ color:#fff; font-weight:600; text-decoration:none; text-shadow:0 2px 8px rgba(0,0,0,.35); }
+.hero-topbar .links a:hover{ text-decoration:underline; }
+.hero-topbar .actions{ display:flex; gap:10px; flex-wrap:wrap; }
+.btn.ghost{ color:#fff; border:1px solid rgba(255,255,255,.55); }
+
+/* ===== Section layouts ===== */
+/* About & Contact: strict two columns on desktop */
+#about .grid, #contact .grid{ grid-template-columns:1fr 1fr; gap:32px; }
+
+/* Work: responsive two-up+ tiles */
+#work .grid{ grid-template-columns:repeat(auto-fit, minmax(380px,1fr)); gap:34px; }
+
+/* ===== Responsive ===== */
+@media (max-width:880px){
+  #about .grid, #work .grid, #contact .grid{ grid-template-columns:1fr; }
+  .col-6{ grid-column:span 12; }
+}
+
+/* TEMP: force the hero image to show */
+.hero-cover{
+  background: #000 url("Images/bg3.jpg") center / cover no-repeat !important;
+  min-height: 80vh; /* keep it tall */
+}
+.hero-cover::before,
+.hero-cover::after{
+  display: none !important; /* disable blur + dark overlay for now */
+}
+
+  </style>
+</head>
+
+<body>
+  
+  <!-- HERO HEADER -->
+<header class="hero-cover">
+  <div class="hero-topbar">
+    <nav class="links">
+      <a href="#about">About</a>
+      <a href="#work">Research</a>
+      <a href="#thesis">Thesis</a>
+      <a href="#pubs">Publications</a>
+      <a href="#contact">Contact</a>
+    </nav>
+
+    <div class="actions">
+      <a class="btn ghost" href="https://github.com/danish1830" target="_blank" rel="noreferrer">GitHub</a>
+      <a class="btn ghost" href="https://www.linkedin.com/in/d2ali/" target="_blank" rel="noreferrer">LinkedIn</a>
+      <a class="btn" href="files/CV_DanishAli.pdf" target="_blank" rel="noreferrer">⬇️ Download CV</a>
+    </div>
+  </div>
+
+  <h1 class="site-title">Syed Danish Ali</h1>
+</header>
+
+
+
+<main class="container">
+
+    <!-- ABOUT -->
+    <section id="about">
+      <div class="grid">
+        <div class="col-6 card">
+          <h2>About Me</h2>
+          <p>I am a recent graduate of the <em>Erasmus Mundus</em> Master’s in Marine Environment, a joint international program between <em>Université de Bordeaux (France)</em>, <em>Universidad del País Vasco (Spain)</em>, and <em>Université de Liège (Belgium)</em>. My academic background bridges marine and climate sciences, combining expertise in physical oceanography, data science, and environmental modelling.</p>
+          <p>I completed my Master’s thesis at the <em>University of Glasgow</em> — <em>School of Geographical and Earth Sciences (Climate Dynamics Lab)</em> under the supervision of Dr. habil Sebastian G. Mutz, where I investigated regime shifts in the climatic controls of Norwegian glaciers. </p>
+          <h3>Research Interests</h3>
+          <ul>
+            <li>Ocean–atmosphere and climate dynamics</li>
+            <li>Cryosphere–ocean interactions</li>
+            <li>Data‑driven and statistical modelling approaches</li>
+            <li>Abrupt & non‑linear events (e.g., tipping points) and regime shifts</li>
+            <li>Climate variability across scales</li>
+          </ul>
+        </div>
+        <div class="col-6 card">
+          <h2>Skills Snapshot</h2>
+          <ul class="list-plain">
+            <li><strong>Modelling:</strong> Building model‑frameworks, empirical‑statistical downscaling</li>
+            <li><strong>Programming:</strong> Python, R, Julia</li>
+            <li><strong>Data Analysis:</strong> ERA5, CMIP6, EOF/PCA, statistical evaluation, feature selection</li>
+            <li><strong>Tools:</strong> QGIS, ArcGIS, SPSS, MATLAB, Illustrator</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- THESIS -->
+    <section id="thesis">
+      <div class="card">
+        <h2>Thesis</h2>
+        <p><strong>Title:</strong> Detection and Explanation of Regime Shifts in the Climatic Controls of Norwegian Glaciers</p>
+        <p class="lead">Download the full manuscript PDF or browse a short presentation :) </p>
+        <div class="pill-links">
+          <a class="btn" href="files/Thesis_DanishAli.pdf" target="_blank" rel="noreferrer">📄 Download PDF</a>
+          <a class="btn ghost" href="files/Thesis_Slides.pdf" target="_blank" rel="noreferrer">🖼️ Slides</a>
+        </div>
+      </div>
+    </section>
+    
+    <!-- RESEARCH / PROJECTS -->
+    <section id="work">
+      <h2>Selected work</h2>
+      <div class="grid">
+        <article class="col-6 card">
+          <h3>Glacier Mass-balance modelling (Norway)</h3>
+          <p>Perfect‑prognosis ESD to predict annual/seasonal mass balance using ERA5 predictors; regime‑shift analysis around 2000.</p>
+          <div class="pill-links">
+    
+          </div>
+        </article>
+        <article class="col-6 card">
+          <h3>Pattern mining in climate fields</h3>
+          <p>EOF/PCA‑based teleconnection diagnostics; feature engineering for ML workflows; robust cross‑validation & feature selection.</p>
+        </article>
+        <article class="col-6 card">
+          <h3>Remote sensing & MHWs</h3>
+          <p>Exploratory SST retrieval and marine heatwave characterization; map design and scale‑aware visual summaries.</p>
+        </article>
+        <article class="col-6 card">
+          <h3>2D Diffusion Model</h3>
+          <p>Simulation of pollution patch using Finite Difference Method (FDM) with explicit and implicit numerical schemes (Neumann
+boundary conditions & optimized CFL constraints for stability).</p>
+        </article>
+      </div>
+    </section>
+
+    
+
+    <!-- PUBLICATIONS -->
+    <section id="pubs">
+      <h2>Publications </h2>
+      <div class="card">
+        <p>In progress: preparing a publication based on the Master’s thesis findings for submission to a relevant Q1 journal such as <em>Journal of Glaciology</em> or <em>The Cryosphere</em>.</p>
+      </div>
+    </section>
+
+    <!-- CONTACT & CV -->
+    <section id="contact">
+      <div class="grid">
+        <div class="col-6 card">
+          <h2>Contact</h2>
+          <p>Open to PhD opportunities in climate/ocean dynamics, ML for Earth :) !</p>
+          <ul>
+            <li>Email: <a href="mailto:danish.science@outlook.com">danish.science@outlook.com</a></li>
+      
+          </ul>
+        </div>
+        <div class="col-6 card" id="cv">
+          <h2>CV</h2>
+          
+          <a class="btn" href="files/CV_DanishAli.pdf" target="_blank" rel="noreferrer">⬇️ Download CV</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <p>© <span id="y"></span> Danish Ali</p>
+  </footer>
+
+  <script>
+    document.getElementById('y').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
