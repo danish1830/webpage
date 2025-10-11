@@ -32,6 +32,12 @@
 /* ===== Base ===== */
 *{ box-sizing:border-box }
 html,body{ margin:0; padding:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text); }
+
+/* Global line spacing */
+body {
+  line-height: 1.7; /* 1.15 means 15% more space between lines */
+}
+
 a{ color:var(--brand); text-decoration:none } a:hover{ text-decoration:underline }
 body{ font-size:17px; } /* gentle bump */
 
@@ -43,6 +49,29 @@ section{ padding:56px 0; }
 .grid{ display:grid; gap:32px; }
 .col-12{ grid-column:span 12; }
 
+/* About section layout */
+#about .grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* 2 columns for lower cards */
+  gap: 32px;
+}
+
+/* make the About box span both columns */
+#about .fullwidth {
+  grid-column: 1 / -1;
+}
+
+/* stack vertically on small screens */
+@media (max-width: 880px) {
+  #about .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Justify text inside cards */
+#about .card p {
+  text-align: justify;
+}
 
 /* Cards */
 .card{
@@ -57,35 +86,97 @@ ul{ margin:0; padding-left:18px; }
 .list-plain li{ padding:10px 0; border-bottom:1px dashed var(--line) }
 
 /* Buttons */
-.btn{
-  display:inline-flex; align-items:center; gap:10px; background:var(--brand); color:#fff;
-  padding:10px 16px; border-radius:12px; border:1px solid color-mix(in hsl, var(--brand) 60%, black);
-  box-shadow:0 10px 20px rgba(0,0,0,.12); font-weight:600; transition:filter .2s ease;
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background-color: #1d4ed8; /* Deep rich blue (stays strong in dark mode) */
+  color: #ffffff;
+  padding: 10px 18px;
+  border-radius: 12px;
+  border: 1px solid #1e3a8a; /* dark border */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  font-weight: 600;
+  transition: all 0.2s ease;
 }
-.btn:hover{ filter:brightness(1.05); text-decoration:none; }
-.btn.ghost{ background:transparent; color:var(--text); border:1px solid var(--line) }
-.pill-links{ display:flex; gap:10px; flex-wrap:wrap; justify-content:left }
+
+.btn:hover {
+  background-color: #2563eb; /* Slightly brighter hover blue */
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+  text-decoration: none;
+}
+/* Ghost button (dark + light mode balanced) */
+.btn.ghost {
+  background-color: rgba(255, 255, 255, 0.12); /* subtle white tint for dark mode */
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  transition: all 0.2s ease;
+}
+
+.btn.ghost:hover {
+  background-color: #ffffff;
+  color: #1d4ed8;
+}
+
+/* Light mode override */
+@media (prefers-color-scheme: light) {
+  .btn.ghost {
+    background-color: rgba(0, 0, 0, 0.22);  /* darker gray for visibility */
+    color: #1d4ed8;
+    border: 1px solid #1d4ed8;
+  }
+
+  .btn.ghost:hover {
+    background-color: #1d4ed8;
+    color: #ffffff;
+  }
+}
+
+
+
 
 /* Footer */
 footer{ margin-top:40px; padding:24px 0; border-top:1px solid var(--line); color:var(--muted); text-align:center }
 
 /* ===== Hero cover ===== */
-header.hero-cover{ position:relative; background:transparent; border:0; margin:0; }
 .hero-cover{
-  width:100%; min-height:80vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
-  text-align:center; background-image: url("./Images/bg3.jpg"); background-position: center; background-size: cover; background-repeat: no-repeat; overflow:hidden; margin-bottom:64px;
-}
-.hero-cover::before{
-  content:""; position:absolute; inset:0; background:inherit; filter:blur(6px) brightness(.95); transform:scale(1.04); z-index:-2;
+  position: relative;
+  width:100%;
+  min-height: clamp(60vh, 72vh, 88vh);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  background: url("Images/bg3.jpg") center/cover no-repeat;
+  margin-bottom:64px;
 }
 .hero-cover::after{
-  content:""; position:absolute; inset:0; background:rgba(0,0,0,.14); z-index:-1;
+  content:"";
+  position:absolute; inset:0;
+  background: linear-gradient(to bottom,
+              rgba(0,0,0,.35) 0%,
+              rgba(0,0,0,.18) 25%,
+              rgba(0,0,0,0) 55%);
+  pointer-events:none;
 }
+.hero-inner{ position:relative; z-index:1; padding-inline:16px; }
 .site-title{
-  margin:0; font-weight:800; font-size:clamp(52px,8vw,104px); line-height:1.05;
-  color:#fff; text-shadow:0 10px 32px rgba(0,0,0,.45); z-index:1;
+  margin:0;
+  font-weight:800;
+  font-size:clamp(44px,8vw,96px);
+  line-height:1.05;
+  color:#fff;
+  text-shadow:0 12px 36px rgba(0,0,0,.45);
 }
-header .brand{ display:none; } /* hide any legacy brand bar */
+.site-subtitle{
+  margin:10px 0 0;
+  font-size:clamp(16px,2.2vw,22px);
+  font-weight:600;
+  color:rgba(255,255,255,.92);
+  text-shadow:0 8px 24px rgba(0,0,0,.35);
+}
+
 
 /* Hero top bar (links + buttons) */
 .hero-topbar{
@@ -145,8 +236,10 @@ header .brand{ display:none; } /* hide any legacy brand bar */
     </div>
   </div>
 
-  <h1 class="site-title">Syed Danish Ali</h1>
-  <p class="site-subtitle">MSc Marine Environment</p>
+  <div class="hero-inner">
+    <h1 class="site-title">Syed Danish Ali</h1>
+    <p class="site-subtitle">MSc Marine Environment</p>
+  </div>
 
 </header>
 
@@ -154,38 +247,53 @@ header .brand{ display:none; } /* hide any legacy brand bar */
 
 <main class="container">
 
-    <!-- ABOUT -->
-    <section id="about">
-      <div class="grid">
-        <div class="col-6 card">
-          <h2>About Me</h2>
-          <p>I am a recent graduate of the <em>Erasmus Mundus</em> Master’s in Marine Environment, a joint international program between <em>Université de Bordeaux (France)</em>, <em>Universidad del País Vasco (Spain)</em>, and <em>Université de Liège (Belgium)</em>. My academic background bridges marine and climate sciences, combining expertise in physical oceanography, data science, and environmental modelling.</p>
-          <p>I completed my Master’s thesis at the <em>University of Glasgow</em> — <em>School of Geographical and Earth Sciences (Climate Dynamics Lab)</em> under the supervision of Dr. habil Sebastian G. Mutz, where I investigated regime shifts in the climatic controls of Norwegian glaciers. </p>
-          <h3>Research Interests</h3>
-          <ul>
-            <li>Ocean–atmosphere and climate dynamics</li>
-            <li>Cryosphere–ocean interactions</li>
-            <li>Data‑driven and statistical modelling approaches</li>
-            <li>Abrupt & non‑linear events (e.g., tipping points) and regime shifts</li>
-            <li>Climate variability across scales</li>
-          </ul>
-        </div>
-        <div class="col-6 card">
-          <h2>Skills Snapshot</h2>
-          <ul class="list-plain">
-            <li><strong>Modelling:</strong> Building model‑frameworks, empirical‑statistical downscaling</li>
-            <li><strong>Programming:</strong> Python, R, Julia</li>
-            <li><strong>Data Analysis:</strong> ERA5, CMIP6, EOF/PCA, statistical evaluation, feature selection</li>
-            <li><strong>Tools:</strong> QGIS, ArcGIS, SPSS, MATLAB, Illustrator</li>
-          </ul>
-        </div>
-      </div>
-    </section>
+  <!-- ABOUT -->
+  <section id="about">
+  <div class="grid">
+    <!-- Full-width About box -->
+    <div class="card fullwidth">
+      <h2>About Me</h2>
+      <p>I am a recent graduate of the <em>Erasmus Mundus</em> Master’s in Marine Environment, a joint international program between 
+        <em>Université de Bordeaux (France)</em>, <em>Universidad del País Vasco (Spain)</em>, 
+        and <em>Université de Liège (Belgium)</em>. My academic background bridges marine and climate sciences, combining 
+        expertise in physical oceanography, data science, and environmental modelling.</p>
+
+      <p>I completed my Master’s thesis at the <em>University of Glasgow — School of Geographical and Earth Sciences 
+        (<a href="https://mutz.science" target="_blank" rel="noreferrer">
+        Climate Dynamics Lab
+        </a>)</em> 
+        under the supervision of Dr. habil Sebastian G. Mutz, where I investigated regime shifts in the climatic controls of Norwegian glaciers.</p>
+    </div>
+
+    <!-- Left column below -->
+    <div class="card">
+      <h2>Skills Snapshot</h2>
+      <ul class="list-plain">
+        <li><strong>Programming:</strong> Python, R, Julia</li>
+        <li><strong>Modelling:</strong> Building model-frameworks, empirical-statistical downscaling</li>
+        <li><strong>Data Analysis:</strong> Large Scale Climate Datasets, Advanced Statistical Analyses (e.g.EOF/PCA), Pattern mining, etc.</li>
+        <li><strong>Tools:</strong> GIS, SPSS Statistics, MATLAB, Adobe Photoshop & Illustrator</li>
+      </ul>
+    </div>
+
+    <!-- Right column below -->
+    <div class="card">
+      <h2>Research Interests</h2>
+      <ul>
+        <li>Ocean–Atmosphere and Climate Dynamics</li>
+        <li>Cryosphere–Ocean Interactions</li>
+        <li>Data-driven and Statistical Modelling Approaches</li>
+        <li>Abrupt & Non-linear Events (e.g., Tipping Points) and Regime Shifts</li>
+        <li>Climate Variability Across Scales</li>
+      </ul>
+    </div>
+  </div>
+</section>
 
     <!-- THESIS -->
     <section id="thesis">
       <div class="card">
-        <h2>Thesis</h2>
+        <h2>Master Thesis</h2>
         <p><strong>Title:</strong> "Detection and Explanation of Regime Shifts in the Climatic Controls of Norwegian Glaciers"</p>
         <p class="lead">Download the full manuscript PDF or browse the thesis defense presentation (20 min) :) </p>
         <div class="pill-links">
@@ -198,21 +306,21 @@ header .brand{ display:none; } /* hide any legacy brand bar */
     
     <!-- RESEARCH / PROJECTS -->
     <section id="work">
-      <h2>Selected work</h2>
+      <h2>Selected Projects</h2>
       <div class="grid">
         <article class="col-6 card">
-          <h3>Glacier Mass-balance modelling (Norway)</h3>
-          <p>Perfect‑prognosis ESD to predict annual/seasonal mass balance using ERA5 predictors; regime‑shift analysis around 2000.</p>
+          <h3>Glacier Mass-balance Modelling (Norway)</h3>
+          <p>Perfect‑prognosis ESD to predict mass-balance components using ERA5 predictors & Regime‑Shift Analysis around the year 2000.</p>
           <div class="pill-links">
     
           </div>
         </article>
         <article class="col-6 card">
-          <h3>Pattern mining in climate fields</h3>
+          <h3>Pattern Mining in Climate Fields</h3>
           <p>EOF/PCA‑based teleconnection diagnostics; feature engineering for ML workflows; robust cross‑validation & feature selection.</p>
         </article>
         <article class="col-6 card">
-          <h3>Remote sensing & MHWs</h3>
+          <h3>Remote Sensing & MHWs</h3>
           <p>Exploratory SST retrieval and marine heatwave characterization; map design and scale‑aware visual summaries.</p>
         </article>
         <article class="col-6 card">
@@ -227,7 +335,7 @@ boundary conditions & optimized CFL constraints for stability).</p>
 
     <!-- PUBLICATIONS -->
     <section id="pubs">
-      <h2>Publications </h2>
+      <h2>Publications (Coming Soon!)</h2>
       <div class="card">
         <p>In progress: preparing a publication based on the Master’s thesis findings for submission to a relevant Q1 journal such as <em>Journal of Glaciology</em> or <em>The Cryosphere</em>.</p>
       </div>
