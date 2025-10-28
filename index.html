@@ -133,33 +133,36 @@ ul{ margin:0; padding-left:18px; }
 }
 
 
-
-
 /* Footer */
 footer{ margin-top:40px; padding:24px 0; border-top:1px solid var(--line); color:var(--muted); text-align:center }
 
 /* ===== Hero cover ===== */
-.hero-cover{
+.hero-cover {
   position: relative;
-  width:100%;
-  min-height: clamp(60vh, 72vh, 88vh);
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  text-align:center;
-  background: url("Images/bg3.jpg") center/cover no-repeat;
-  margin-bottom:64px;
+  width: 100%;
+  min-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  margin-bottom: 64px;
+
+  /* Layered gradient over image */
+  background:
+    linear-gradient(
+      rgba(0, 0, 0, 0.45),
+      rgba(0, 0, 0, 0.25)
+    ),
+    url("Images/bg3.jpg") center / cover no-repeat;
+
+  background-attachment: fixed; /* 👈 makes it scroll slower than page (parallax) */
+  background-position: center;
+  background-size: cover;
+  transition: background-position 0.2s ease-out;
 }
-.hero-cover::after{
-  content:"";
-  position:absolute; inset:0;
-  background: linear-gradient(to bottom,
-              rgba(0,0,0,.35) 0%,
-              rgba(0,0,0,.18) 25%,
-              rgba(0,0,0,0) 55%);
-  pointer-events:none;
-}
+
+
 .hero-inner{ position:relative; z-index:1; padding-inline:16px; }
 .site-title{
   margin:0;
@@ -203,13 +206,82 @@ footer{ margin-top:40px; padding:24px 0; border-top:1px solid var(--line); color
 }
 
 /* TEMP: force the hero image to show */
-.hero-cover{
+/* .hero-cover{
   background: #000 url("Images/bg3.jpg") center / cover no-repeat !important;
   min-height: 80vh; /* keep it tall */
-}
+/*}
 .hero-cover::before,
 .hero-cover::after{
   display: none !important; /* disable blur + dark overlay for now */
+/*}
+
+/* --- Ensure equal spacing between content and buttons in project cards --- */
+#work .card p,
+#work .card ul {
+  margin-bottom: 16px; /* same bottom margin for both paragraph & bullet lists */
+}
+
+#work .pill-links {
+  margin-top: 8px; /* consistent top spacing for buttons */
+}
+
+.cert-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cert-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%; /* ✅ make each row span the full card width */
+  margin-bottom: 14px;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--line);
+}
+
+.cert-list li span {
+  flex: 1; /* ✅ ensures text area expands */
+  font-size: 17px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.cert-list li:last-child {
+  border-bottom: none;
+}
+
+/* Responsive layout for mobile */
+@media (max-width: 700px) {
+  .cert-list li {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .cert-list li a {
+    align-self: flex-start;
+  }
+}
+
+.cv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* pushes button to right */
+  width: 100%;
+}
+
+.cv-header h2 {
+  margin: 0;
+  font-size: 24px;
+}
+
+@media (max-width: 700px) {
+  .cv-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
 }
 
   </style>
@@ -280,7 +352,7 @@ footer{ margin-top:40px; padding:24px 0; border-top:1px solid var(--line); color
     <div class="card">
       <h2>Research Interests</h2>
       <ul>
-        <li>Ocean–Atmosphere and Climate Dynamics</li>
+        <li>Ocean–Atmosphere Dynamics</li>
         <li>Cryosphere–Ocean Interactions</li>
         <li>Data-driven and Statistical Modelling Approaches</li>
         <li>Abrupt & Non-linear Events (e.g., Tipping Points) and Regime Shifts</li>
@@ -311,6 +383,7 @@ footer{ margin-top:40px; padding:24px 0; border-top:1px solid var(--line); color
     <section id="work">
       <h2>Selected Projects</h2>
       <div class="grid">
+        
         <article class="col-6 card">
           <h3>Glacier Mass-balance Modelling (Norway)</h3>
           <p>Perfect‑prognosis ESD to predict mass-balance components using ERA5 predictors & Regime‑Shift Analysis around the year 2000.</p>
@@ -318,19 +391,60 @@ footer{ margin-top:40px; padding:24px 0; border-top:1px solid var(--line); color
     
           </div>
         </article>
+        
         <article class="col-6 card">
           <h3>Pattern Mining in Climate Fields</h3>
           <p>EOF/PCA‑based teleconnection diagnostics; feature engineering for ML workflows; robust cross‑validation & feature selection.</p>
         </article>
+        
         <article class="col-6 card">
           <h3>Remote Sensing & MHWs</h3>
           <p>Exploratory SST retrieval and marine heatwave characterization; map design and scale‑aware visual summaries.</p>
+
+          <a class="btn" href=" https://drive.google.com/file/d/10zG1_SLOsyvnsGXjOOxKAyCg_JrHJSRv/view?usp=sharing" target="_blank" rel="noreferrer">📄 Document</a>
+          <a class="btn ghost" href="" target="_blank" rel="noreferrer">💻 Code</a>
+          
         </article>
+        
         <article class="col-6 card">
           <h3>2D Diffusion Model</h3>
-          <p>Simulation of pollution patch using Finite Difference Method (FDM) with explicit and implicit numerical schemes (Neumann
-boundary conditions & optimized CFL constraints for stability).</p>
+          <p>Simulation of pollution patch using Finite Difference Method (FDM) with explicit and implicit numerical schemes (Neumann boundary conditions & optimized CFL constraints for stability).</p>
+
+          <a class="btn" href="https://drive.google.com/file/d/1MMMSRW8BcD5i67WL_GToM2pqPrGTUM9H/view?usp=sharing" target="_blank" rel="noreferrer">📄 Document</a>
+          <a class="btn ghost" href="https://drive.google.com/file/d/1RO5JuIvx4_zhuIkQrxLdXAnrKnGZcIdH/view?usp=sharing" target="_blank" rel="noreferrer">🖼️ Slides</a>
+          <a class="btn" href="" target="_blank" rel="noreferrer">💻 Code</a>
+          
         </article>
+
+        <article class="col-6 card">
+          <h3>Sertraline Toxicity Bioassay</h3>
+          <ul>
+            <li>Designed an acute toxicity bioassay as part of a team to assess the toxicity of the anti-depressant Sertraline (SRT) on marine copepods <em>(Acartia tonsa)</em> over 24h and 48h exposure.</li>
+            <li>Conducted several statistical analyses (ANOVA, Probit analysis) & time-dependent mortality tests using R and IBM SPSS.</li>
+          </ul>
+          <div class="pill-links">
+
+          <a class="btn" href="https://drive.google.com/file/d/1x12a8K6138kY0hcasuruUA14eQA7nFzA/view?usp=sharing" target="_blank" rel="noreferrer">📄 Document</a>
+          <a class="btn ghost" href="https://drive.google.com/file/d/14Q4AIr37IAHnBqn1LyTZZB50ywuk0DUG/view?usp=sharing" target="_blank" rel="noreferrer">🖼️ Poster</a>
+
+        </article>
+
+
+        <article class="col-6 card">
+          <h3>NPZDO₂ Biogeochemical Model</h3>
+          <ul>
+            <li>Developed a extended NPZDO₂ biogeochemical model to simulate the dynamics of nutrients in aquatic systems.</li>
+            <li>The framework model has oxygen dynamics for eutrophication management, nutrient speciation, & sediment interactions.</li>
+            <li>Implemented the model in R and conducted sensitivity analyses to assess the impact of key parameters on model output.</li>
+          </ul>
+          <div class="pill-links">
+
+          <a class="btn" href="https://drive.google.com/file/d/1TVaG9r3iNT9fluCzEPGdO_PVzWE7guts/view?usp=sharing" target="_blank" rel="noreferrer">📄 Document</a>
+          <a class="btn ghost" href="" target="_blank" rel="noreferrer">💻 Code</a>
+
+        </article>
+
+
       </div>
     </section>
 
@@ -344,6 +458,25 @@ boundary conditions & optimized CFL constraints for stability).</p>
       </div>
     </section>
 
+    
+    <!-- CERTIFICATIONS -->
+  <section id="certifications">
+    <div class="card">
+      <h2>Certifications</h2>
+      <ul class="cert-list">
+        <li>
+          <span>Oil & Gas Industry Operations and Markets- Duke University (Coursera)</span>
+          <a class="btn" href="https://drive.google.com/file/d/1uxDhTxApJT0YC5Q-CoDB7a3vybS06ZcI/view?usp=sharing" target="_blank" rel="noreferrer">📄 Certificate</a>
+        </li>
+        <li>
+          <span>Satellite Remote Sensing of Atmosphere- Indian Institute of Remote Sensing (Course)</span>
+          <a class="btn" href="https://drive.google.com/file/d/1acJHa_bGw0y2wmqVlXi2SZ6lKLl2Uw3j/view?usp=sharing" target="_blank" rel="noreferrer">📄 Certificate</a>
+        </li>
+        
+      </ul>
+    </div>
+  </section>
+
     <!-- CONTACT & CV -->
     <section id="contact">
       <div class="grid">
@@ -352,7 +485,7 @@ boundary conditions & optimized CFL constraints for stability).</p>
           <p>Open to PhD opportunities in climate/ocean dynamics, ML for Earth :) !</p>
           <ul>
             <li>Email: <a href="mailto:danish.science@outlook.com">danish.science@outlook.com</a></li>
-      
+            <li>Work: <a href="mailto:SyedDanish.ali@glasgow.ac.uk">SyedDanish.ali@glasgow.ac.uk</a></li>
           </ul>
         </div>
         <div class="col-6 card" id="cv">
@@ -372,5 +505,28 @@ boundary conditions & optimized CFL constraints for stability).</p>
   <script>
     document.getElementById('y').textContent = new Date().getFullYear();
   </script>
+
+  <script>
+  const hero = document.querySelector('.hero-cover');
+  let latestScroll = 0;
+  let ticking = false;
+
+  function smoothParallax() {
+    const offset = latestScroll * 0.4; // adjust this for speed
+    hero.style.backgroundPosition = `center ${offset}px`;
+    ticking = false;
+  }
+
+  window.addEventListener('scroll', () => {
+    latestScroll = window.scrollY;
+    if (!ticking) {
+      window.requestAnimationFrame(smoothParallax);
+      ticking = true;
+    }
+  });
+</script>
+
+
+
 </body>
 </html>
