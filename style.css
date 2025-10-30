@@ -1,0 +1,279 @@
+
+    /* ===== Design tokens ===== */
+:root{
+  --bg:#0b0c10; --panel:#121419; --card:#171a21; --text:#e8eef6; --muted:#9fb3c8;
+  --brand:#4cc9f0; --accent:#80ffdb; --line:#232633;
+  --bg-light:#ffffff; --panel-light:#f7f8fb; --card-light:#ffffff; --text-light:#0e1726;
+  --muted-light:#4b5563; --line-light:#e5e7eb; --brand-light:#2563eb; --accent-light:#06b6d4;
+}
+@media (prefers-color-scheme:light){
+  :root{
+    --bg:var(--bg-light); --panel:var(--panel-light); --card:var(--card-light);
+    --text:var(--text-light); --muted:var(--muted-light); --line:var(--line-light);
+    --brand:var(--brand-light); --accent:var(--accent-light);
+  }
+}
+
+/* ===== Base ===== */
+*{ box-sizing:border-box }
+html,body{ margin:0; padding:0; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text); }
+
+/* Global line spacing */
+body {
+  line-height: 1.7; /* 1.15 means 15% more space between lines */
+}
+
+a{ color:var(--brand); text-decoration:none } a:hover{ text-decoration:underline }
+body{ font-size:17px; } /* gentle bump */
+
+/* Page container */
+.container{ max-width:1280px; margin-inline:auto; padding:56px 40px; }
+
+/* Sections & grids */
+section{ padding:56px 0; }
+.grid{ display:grid; gap:32px; }
+.col-12{ grid-column:span 12; }
+
+/* About section layout */
+#about .grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* 2 columns for lower cards */
+  gap: 32px;
+}
+
+/* make the About box span both columns */
+#about .fullwidth {
+  grid-column: 1 / -1;
+}
+
+/* stack vertically on small screens */
+@media (max-width: 880px) {
+  #about .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Justify text inside cards */
+#about .card p {
+  text-align: justify;
+}
+
+/* Cards */
+.card{
+  background:var(--card); border:1px solid var(--line);
+  border-radius:20px; padding:34px 36px; box-shadow:0 6px 20px rgba(0,0,0,.08);
+}
+h2{ font-size:24px; margin:0 0 14px; }
+h3{ font-size:19px; margin:0 0 10px; }
+p{ margin:0 0 14px; }
+ul{ margin:0; padding-left:18px; }
+.list-plain{ list-style:none; padding:0 }
+.list-plain li{ padding:10px 0; border-bottom:1px dashed var(--line) }
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background-color: #1d4ed8; /* Deep rich blue (stays strong in dark mode) */
+  color: #ffffff;
+  padding: 10px 18px;
+  border-radius: 12px;
+  border: 1px solid #1e3a8a; /* dark border */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn:hover {
+  background-color: #2563eb; /* Slightly brighter hover blue */
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+  text-decoration: none;
+}
+/* Ghost button (dark + light mode balanced) */
+.btn.ghost {
+  background-color: rgba(255, 255, 255, 0.12); /* subtle white tint for dark mode */
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  transition: all 0.2s ease;
+}
+
+.btn.ghost:hover {
+  background-color: #ffffff;
+  color: #1d4ed8;
+}
+
+/* Light mode override */
+@media (prefers-color-scheme: light) {
+  .btn.ghost {
+    background-color: rgba(0, 0, 0, 0.22);  /* darker gray for visibility */
+    color: #1d4ed8;
+    border: 1px solid #1d4ed8;
+  }
+
+  .btn.ghost:hover {
+    background-color: #1d4ed8;
+    color: #ffffff;
+  }
+}
+
+
+/* Footer */
+footer{ margin-top:40px; padding:24px 0; border-top:1px solid var(--line); color:var(--muted); text-align:center }
+
+/* ===== Hero cover ===== */
+.hero-cover {
+  position: relative;
+  width: 100%;
+  min-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  margin-bottom: 64px;
+
+  /* Layered gradient over image */
+  background:
+    linear-gradient(
+      rgba(0, 0, 0, 0.45),
+      rgba(0, 0, 0, 0.25)
+    ),
+    url("Images/bg3.jpg") center / cover no-repeat;
+
+  background-attachment: fixed; /* 👈 makes it scroll slower than page (parallax) */
+  background-position: center;
+  background-size: cover;
+  transition: background-position 0.2s ease-out;
+}
+
+
+.hero-inner{ position:relative; z-index:1; padding-inline:16px; }
+.site-title{
+  margin:0;
+  font-weight:800;
+  font-size:clamp(44px,8vw,96px);
+  line-height:1.05;
+  color:#fff;
+  text-shadow:0 12px 36px rgba(0,0,0,.45);
+}
+.site-subtitle{
+  margin:10px 0 0;
+  font-size:clamp(16px,2.2vw,22px);
+  font-weight:600;
+  color:rgba(255,255,255,.92);
+  text-shadow:0 8px 24px rgba(0,0,0,.35);
+}
+
+
+/* Hero top bar (links + buttons) */
+.hero-topbar{
+  position:absolute; top:14px; left:50%; transform:translateX(-50%);
+  width:min(1280px,92%); display:flex; align-items:center; justify-content:space-between; gap:16px; z-index:2;
+}
+.hero-topbar .links{ display:flex; gap:18px; flex-wrap:wrap; }
+.hero-topbar .links a{ color:#fff; font-weight:600; text-decoration:none; text-shadow:0 2px 8px rgba(0,0,0,.35); }
+.hero-topbar .links a:hover{ text-decoration:underline; }
+.hero-topbar .actions{ display:flex; gap:10px; flex-wrap:wrap; }
+.btn.ghost{ color:#fff; border:1px solid rgba(255,255,255,.55); }
+
+/* ===== Section layouts ===== */
+/* About & Contact: strict two columns on desktop */
+#about .grid, #contact .grid{ grid-template-columns:1fr 1fr; gap:32px; }
+
+/* Work: responsive two-up+ tiles */
+#work .grid{ grid-template-columns:repeat(auto-fit, minmax(380px,1fr)); gap:34px; }
+
+/* ===== Responsive ===== */
+@media (max-width:880px){
+  #about .grid, #work .grid, #contact .grid{ grid-template-columns:1fr; }
+  .col-6{ grid-column:span 12; }
+}
+
+/* TEMP: force the hero image to show */
+/* .hero-cover{
+  background: #000 url("Images/bg3.jpg") center / cover no-repeat !important;
+  min-height: 80vh; /* keep it tall */
+/*}
+.hero-cover::before,
+.hero-cover::after{
+  display: none !important; /* disable blur + dark overlay for now */
+/*}
+
+/* --- Ensure equal spacing between content and buttons in project cards --- */
+#work .card p,
+#work .card ul {
+  margin-bottom: 16px; /* same bottom margin for both paragraph & bullet lists */
+}
+
+#work .pill-links {
+  margin-top: 8px; /* consistent top spacing for buttons */
+}
+
+.cert-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cert-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%; /* ✅ make each row span the full card width */
+  margin-bottom: 14px;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--line);
+}
+
+.cert-list li span {
+  flex: 1; /* ✅ ensures text area expands */
+  font-size: 17px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.cert-list li:last-child {
+  border-bottom: none;
+}
+
+/* Responsive layout for mobile */
+@media (max-width: 700px) {
+  .cert-list li {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .cert-list li a {
+    align-self: flex-start;
+  }
+}
+
+.cv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* pushes button to right */
+  width: 100%;
+}
+
+.cv-header h2 {
+  margin: 0;
+  font-size: 24px;
+}
+
+@media (max-width: 700px) {
+  .cv-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+}
+
+/* --- Thesis page balanced spacing --- */
+body main.container section {
+  padding: 20px 0;   /* gives ~index-style vertical rhythm */
+}
+
+body main.container .card {
+  margin-bottom: 0;  /* remove extra bottom margin inside each section */
+}

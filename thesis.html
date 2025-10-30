@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Master Thesis — Syed Danish Ali</title>
+
+  <!-- Fonts & shared styles -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <main class="container">
+
+    <!-- === HEADER SECTION === -->
+    <section>
+      <a href="index.html" class="btn ghost">← Back to Home</a>
+      <h1>Master Thesis</h1>
+
+      <div class="card">
+        <h2>"Detection and Explanation of Regime Shifts in the Climatic Controls of Norwegian Glaciers"</h2>
+        <p><strong>Institution:</strong> University of Glasgow, School of Geographical and Earth Sciences</p>
+        <p><strong>Supervisor:</strong> Dr. rer. nat. habil. Sebastian G. Mutz</p>
+    
+      </div>
+    </section>
+
+    <!-- === AIM === -->
+    <section>
+      <div class="card">
+        <h2>Aim</h2>
+        <ul>
+            <li> Detect & explain regime shifts in glacier–climate relationships (pre-2000 vs post-2000). </li>
+            <li> Develop an empirical-statistical model framework for glacier mass balance. </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- === Hypothesis === -->
+    <section>
+      <div class="card">
+        <h2>Hypothesis</h2>
+        <p>"The turn of the century marks the transition to a new glacier regime, characterized by a change in the climatic controls on annual mass balances.</p>
+      </div>
+    </section>
+
+    <!-- === METHODS === -->
+    <section>
+      <div class="card">
+        <h2>Methods</h2>
+        <p> Data sources: ERA5 reanalysis (ECMWF), CMIP6 projections, and glacier mass-balance observations (NVE: Norwegian Water Resources and Energy Directorate).</p>
+
+        <p> Part A:
+            <ul>
+                <li>Exploratory data analysis of glacier mass-balance time series (1950–2023).</li>
+                <li>Empirical Orthogonal Function (EOF) analysis to identify dominant modes of variability.</li>
+                <li>Detection of regime shifts using correlation testing, moving-window analyses, and comparing pre-2000 & post-2000 periods.</li>
+            </ul>
+        </p>
+        <p>
+            Part B:
+            <ul>
+                <li>Predictor selection using Recursive & Tree-based selection and ensemble cross-validation.</li>
+                <li>Empirical-Statistical Downscaling via <code>pyESD</code> framework with 6 regressors (ARD, RidgeCV, RandomForest, Bagging, Stacking) & 3 selectors (Recursive, Tree-Based, Sequential).</li>
+                <li>Model evaluation using cross-validation and performance metrics (e.g., RMSE, R²).</li>
+            </ul>
+        </p>
+        
+      </div>
+    </section>
+
+    <!-- === RESULTS === -->
+    <section>
+      <div class="card">
+        <h2>Results & Findings</h2>
+        <p> Part A: </p>
+        <ul>
+          <li>Identified a major regime shift around 2000 for most glaciers.</li>
+          <li>Post-2000 shift in regime: from winter (bw) → summer (bs) dominated control.</li>
+          <li>Shift from winter precipitation (NAO) → temperature-dominant controls on glacier mass balance.</li>
+          <li>Spatial gradient: maritime glaciers (↑ precipitation sensitive) & continental glaciers (↑ temperature sensitive). </li>
+
+        </ul>
+
+        <h3 style="margin-top: 16px; color: #ef4444;"> Weaker NAO (↓ P(acc)) + higher T(abl) → MOST NEGATIVE BALANCE ON RECORD POST-2000! </h3>
+
+        <p> Part B: </p>
+        <ul>
+          <li>Model type: Linear (ARD, RidgeCV, BYR) ≥ non-linear models (Bag, RF, XGBoost). </li>
+          <li>Dataset size: More complete records pre-2000 → better predictive skill. </li>
+          <li>Spatial gradient: maritime glaciers (↑ performance) & continental glaciers (↓ performance). </li>
+        </ul>
+
+        <h3 style="margin-top: 16px; color: #ef4444;"> Incorporate proxy data + robust dataset → Improved model performance </h3>
+
+      </div>
+    </section>
+
+    <!-- === DOWNLOADS === -->
+    <section>
+      <div class="card">
+        <h2>Downloads</h2>
+        <a class="btn" href="/webpage/Files/Thesis_final_improved.pdf" target="_blank" rel="noreferrer">📄 Download PDF</a>
+
+          <a class="btn ghost" href="/webpage/Files/Danish_Presentation.pdf" target="_blank" rel="noreferrer">🖼️ Slides</a>
+
+          <a class="btn" href="https://www.youtube.com/watch?v=1q1zzwHvEb4" target="_blank" rel="noreferrer">🌐 View Presentation</a>
+      </div>
+    </section>
+
+  </main>
+</body>
+</html>
