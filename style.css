@@ -159,7 +159,7 @@ footer{ margin-top:40px; padding:24px 0; border-top:1px solid var(--line); color
 }
 .site-subtitle{
   margin:10px 0 0;
-  font-size:clamp(16px,2.2vw,22px);
+  font-size:clamp(24px,2.2vw,22px);
   font-weight:600;
   color:rgba(255,255,255,.92);
   text-shadow:0 8px 24px rgba(0,0,0,.35);
