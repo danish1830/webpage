@@ -121,7 +121,8 @@ ul{ margin:0; padding-left:18px; }
 /* Footer */
 footer{ margin-top:40px; padding:24px 0; border-top:1px solid var(--line); color:var(--muted); text-align:center }
 
-/* ===== HERO SECTION ===== */
+/* ===== Hero cover ===== */
+/* === FIX HERO TEXT VERTICAL ALIGNMENT === */
 .hero-cover {
   position: relative;
   width: 100%;
@@ -129,13 +130,16 @@ footer{ margin-top:40px; padding:24px 0; border-top:1px solid var(--line); color
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: center; /* ✅ ensures vertical centering */
   text-align: center;
-  padding-top: 60px;
+  padding-top: 60px; /* ✅ adds breathing space below the topbar */
   margin-bottom: 64px;
 
   background:
-    linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.25)),
+    linear-gradient(
+      rgba(0, 0, 0, 0.45),
+      rgba(0, 0, 0, 0.25)
+    ),
     url("Images/bg3.jpg") center / cover no-repeat;
   background-attachment: fixed;
   background-position: center;
@@ -143,133 +147,292 @@ footer{ margin-top:40px; padding:24px 0; border-top:1px solid var(--line); color
   transition: background-position 0.2s ease-out;
 }
 
-.hero-inner {
-  position: relative;
-  z-index: 1;
-  padding-inline: 16px;
+.hero-inner{ position:relative; z-index:1; padding-inline:16px; }
+.site-title{
+  margin:0;
+  font-weight:800;
+  font-size:clamp(44px,8vw,96px);
+  line-height:1.05;
+  color:#fff;
+  text-shadow:0 12px 36px rgba(0,0,0,.45);
 }
 
-.site-title {
+/* Hero top bar (links + buttons) */
+.hero-topbar{
+  position:absolute; top:14px; left:50%; transform:translateX(-50%);
+  width:min(1280px,92%); display:flex; align-items:center; justify-content:space-between; gap:16px; z-index:2;
+}
+.hero-topbar .links{ display:flex; gap:18px; flex-wrap:wrap; }
+.hero-topbar .links a{ color:#fff; font-weight:600; text-decoration:none; text-shadow:0 2px 8px rgba(0,0,0,.35); }
+.hero-topbar .links a:hover{ text-decoration:underline; }
+.hero-topbar .actions{ display:flex; gap:10px; flex-wrap:wrap; }
+.btn.ghost{ color:#fff; border:1px solid rgba(255,255,255,.55); }
+
+/* ===== Section layouts ===== */
+/* About & Contact: strict two columns on desktop */
+#about .grid, #contact .grid{ grid-template-columns:1fr 1fr; gap:32px; }
+
+/* Work: responsive two-up+ tiles */
+#work .grid{ grid-template-columns:repeat(auto-fit, minmax(380px,1fr)); gap:34px; }
+
+/* ===== Responsive ===== */
+@media (max-width:880px){
+  #about .grid, #work .grid, #contact .grid{ grid-template-columns:1fr; }
+  .col-6{ grid-column:span 12; }
+}
+
+/* TEMP: force the hero image to show */
+/* .hero-cover{
+  background: #000 url("Images/bg3.jpg") center / cover no-repeat !important;
+  min-height: 80vh; /* keep it tall */
+/*}
+.hero-cover::before,
+.hero-cover::after{
+  display: none !important; /* disable blur + dark overlay for now */
+/*}
+
+/* --- Ensure equal spacing between content and buttons in project cards --- */
+#work .card p,
+#work .card ul {
+  margin-bottom: 16px; /* same bottom margin for both paragraph & bullet lists */
+}
+
+#work .pill-links {
+  margin-top: 8px; /* consistent top spacing for buttons */
+}
+
+.cert-list {
+  list-style: none;
   margin: 0;
-  font-weight: 800;
-  font-size: clamp(44px, 8vw, 96px);
-  line-height: 1.05;
-  color: #fff;
-  text-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+  padding: 0;
 }
 
-.site-subtitle {
-  margin-top: 12px;
-  font-size: clamp(28px, 5vw, 48px);
-  font-weight: 700;
-  color: #ffffff;
-  text-shadow: 0 6px 28px rgba(0, 0, 0, 0.45);
+.cert-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%; /* ✅ make each row span the full card width */
+  margin-bottom: 14px;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--line);
 }
 
-.site-subsubtitle {
-  margin-top: 6px;
-  font-size: clamp(18px, 3.5vw, 26px);
+.cert-list li span {
+  flex: 1; /* ✅ ensures text area expands */
+  font-size: 17px;
+  color: var(--text);
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
-  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
 }
 
-/* Hero top bar */
-.hero-topbar {
-  position: absolute;
-  top: 14px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(1280px, 92%);
+.cert-list li:last-child {
+  border-bottom: none;
+}
+
+/* Responsive layout for mobile */
+@media (max-width: 700px) {
+  .cert-list li {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .cert-list li a {
+    align-self: flex-start;
+  }
+}
+
+.cv-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  z-index: 2;
+  justify-content: space-between; /* pushes button to right */
+  width: 100%;
 }
 
-.hero-topbar .links {
-  display: flex;
-  gap: 18px;
-  flex-wrap: wrap;
+.cv-header h2 {
+  margin: 0;
+  font-size: 24px;
 }
 
-.hero-topbar .links a {
-  color: #fff;
-  font-weight: 600;
-  text-decoration: none;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-}
-
-.hero-topbar .links a:hover {
-  text-decoration: underline;
-}
-
-.hero-topbar .actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-/* ===== MOBILE FIX (<=768px) ===== */
-@media only screen and (max-width: 768px) {
-  /* make topbar inline and center everything */
-  .hero-topbar {
-    position: static;
-    transform: none;
+@media (max-width: 700px) {
+  .cv-header {
     flex-direction: column;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 20px;
+    align-items: flex-start;
+    gap: 10px;
+  }
+}
+
+/* --- Thesis page balanced spacing --- */
+body main.container section {
+  padding: 20px 0;   /* gives ~index-style vertical rhythm */
+}
+
+body main.container .card {
+  margin-bottom: 0;  /* remove extra bottom margin inside each section */
+}
+
+
+.img-card {
+  display: block !important;
+  width: 100% !important;
+  max-width: 900px !important;
+  height: auto !important;
+  margin: 16px auto !important;
+  border-radius: 14px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+/* === Make Thesis card same width as other cards === */
+#thesis .card {
+  max-width: 100%;   /* remove the artificial limit */
+  margin: 0 auto;    /* keep it centered */
+}
+
+#thesis {
+  padding: 56px 0; /* same vertical rhythm as others */
+}
+
+/* === FINAL — consistent thesis image sizing === */
+#thesis .img-card {
+  display: block;
+  margin: 24px auto;
+  width: 95%;        /* fills most of the card */
+  max-width: 1100px; /* avoids extreme stretch on large screens */
+  height: auto;
+  border-radius: 14px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+#thesis .img-wrap img {
+  width: auto;             /* prevents forced stretch */
+  max-width: 900px;        /* cap image width */
+  height: auto;
+  display: block;
+  border-radius: 14px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.pill-links {
+  margin-top: 16px; /* space between text/list and buttons */
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px; /* spacing between buttons */
+}
+
+/* ======= UNIVERSAL RESPONSIVE DESIGN ======= */
+
+/* Tablets (<=1024px): tighten layout but keep grids */
+@media (max-width: 1024px) {
+  .container {
+    padding: 40px 28px;
+  }
+  .grid {
+    gap: 24px;
+  }
+  .card {
+    padding: 28px 30px;
+  }
+}
+
+/* Phones (<=768px): switch to single column layout */
+@media (max-width: 768px) {
+  /* General container spacing */
+  .container {
+    padding: 32px 20px;
   }
 
-  .hero-topbar .actions {
+  /* Grid: single column everywhere */
+  .grid {
+    grid-template-columns: 1fr !important;
+    gap: 24px;
+  }
+
+  /* Cards: slightly smaller padding */
+  .card {
+    padding: 22px 24px;
+    border-radius: 16px;
+  }
+
+  /* Font sizes (balanced readability) */
+  h1 {
+    font-size: 1.9rem;
+    line-height: 1.2;
+  }
+  h2 {
+    font-size: 1.35rem;
+  }
+  h3 {
+    font-size: 1.1rem;
+  }
+  body {
+    font-size: 15.5px;
+    line-height: 1.6;
+  }
+
+  /* Buttons stack full width */
+  .btn {
+    width: 100%;
     justify-content: center;
+    padding: 10px 0;
+    font-size: 15px;
+  }
+  .pill-links {
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 16px;
   }
 
-  /* hero height + spacing */
+  /* Hero image simpler on mobile */
   .hero-cover {
-    min-height: 75vh;
-    padding-top: 60px;
-    padding-bottom: 40px;
+    min-height: 60vh;
     background-attachment: scroll;
-    justify-content: flex-start;
+    background-position: center center;
   }
-
-  /* text scaling */
   .site-title {
-    font-size: clamp(42px, 10vw, 70px);
+    font-size: clamp(36px, 9vw, 60px);
   }
 
-  .site-subtitle {
-    font-size: clamp(26px, 6vw, 40px);
+  /* About, Work, Contact all single column */
+  #about .grid,
+  #work .grid,
+  #contact .grid {
+    grid-template-columns: 1fr !important;
+    gap: 24px;
   }
 
-  .site-subsubtitle {
-    font-size: clamp(18px, 4.5vw, 26px);
+  /* Thesis section image scaling */
+  #thesis .img-card {
+    width: 100%;
+    max-width: 100%;
+    margin: 12px 0;
+  }
+
+  /* Certifications layout stack */
+  .cert-list li {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 15px;
+  }
+
+  /* Footer smaller and tighter */
+  footer {
+    font-size: 14px;
+    padding: 18px 0;
   }
 }
 
-
-
-
-/* Keep welcome text large enough */
-  .site-title {
-    font-size: clamp(42px, 10vw, 70px) !important;
-    line-height: 1.1;
+/* Small phones (<=480px): compact everything */
+@media (max-width: 480px) {
+  body {
+    font-size: 14.5px;
   }
-
-  /* Make your name more prominent */
-  .site-subtitle {
-    font-size: clamp(26px, 6vw, 40px) !important;
-    font-weight: 700;
-    margin-top: 10px;
+  h1 {
+    font-size: 1.6rem;
   }
-
-  /* Subtitle under name */
-  .site-subsubtitle {
-    font-size: clamp(18px, 4.5vw, 26px) !important;
-    font-weight: 500;
-    opacity: 0.95;
+  .card {
+    padding: 18px 20px;
+  }
+  .btn {
+    font-size: 14px;
   }
 }
+
