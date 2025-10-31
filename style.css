@@ -435,3 +435,19 @@ body main.container .card {
     font-size: 14px;
   }
 }
+
+/* --- Fix hero text overlap on mobile --- */
+@media (max-width: 768px) {
+  .hero-inner {
+    position: relative;
+    z-index: 1;
+    padding-inline: 16px;
+    transform: translateY(80px); /* ✅ push text down */
+  }
+
+  .hero-cover {
+    padding-top: 140px; /* ✅ extra breathing space below topbar */
+    min-height: 80vh;  /* keep it tall enough */
+    justify-content: flex-start; /* prevent center from colliding with topbar */
+  }
+}
