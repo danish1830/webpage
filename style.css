@@ -147,30 +147,73 @@ footer{ margin-top:40px; padding:24px 0; border-top:1px solid var(--line); color
   transition: background-position 0.2s ease-out;
 }
 
-
 .hero-inner{ position:relative; z-index:1; padding-inline:16px; }
-.site-title{
-  margin:0;
-  font-weight:800;
-  font-size:clamp(44px,8vw,96px);
-  line-height:1.05;
-  color:#fff;
-  text-shadow:0 12px 36px rgba(0,0,0,.45);
+/* ===== HERO TEXT STYLES ===== */
+.site-title {
+  margin: 0;
+  font-weight: 800;
+  font-size: clamp(50px, 7vw, 100px); /* ✅ scales perfectly desktop→tablet */
+  line-height: 1.05;
+  color: #F59E0B; /* warm amber – readable on all modes */
+  text-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
 }
 .site-subtitle {
-  margin: 14px 0 0;
-  font-size: clamp(34px, 4vw, 68px); /* 🔹 Bigger + scales smoothly */
+  margin-top: 14px;
+  font-size: clamp(30px, 3.5vw, 64px); /* ✅ smaller on phones */
   font-weight: 800;
   color: #ffffff;
   text-shadow: 0 6px 28px rgba(0, 0, 0, 0.45);
-  letter-spacing: 0.5px; /* adds subtle spacing */
+  letter-spacing: 0.5px;
 }
 .site-subsubtitle {
-  font-size: clamp(20px, 2.4vw, 34px);
+  font-size: clamp(18px, 2.4vw, 30px);
   font-weight: 500;
   color: rgba(255, 255, 255, 0.9);
   text-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
   margin-top: 6px;
+}
+
+/* ===== MOBILE REFINEMENTS (≤768px) ===== */
+@media (max-width: 768px) {
+  .hero-cover {
+    min-height: 75vh;
+    background-attachment: scroll;
+    background-position: center center;
+    padding: 0 12px;
+  }
+  .site-title {
+    font-size: clamp(36px, 8vw, 56px); /* ✅ reduces big title on phones */
+    line-height: 1.1;
+  }
+  .site-subtitle {
+    font-size: clamp(24px, 5vw, 40px);
+    margin-top: 10px;
+  }
+  .site-subsubtitle {
+    font-size: clamp(16px, 3.8vw, 24px);
+  }
+  .hero-topbar {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .hero-topbar .actions {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
+/* ===== SMALL PHONES (≤480px) ===== */
+@media (max-width: 480px) {
+  .site-title {
+    font-size: clamp(32px, 9vw, 48px);
+  }
+  .site-subtitle {
+    font-size: clamp(20px, 5vw, 32px);
+  }
+  .site-subsubtitle {
+    font-size: clamp(14px, 4vw, 22px);
+  }
 }
 
 /* Hero top bar (links + buttons) */
