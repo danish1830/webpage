@@ -436,16 +436,22 @@ body main.container .card {
   }
 }
 
-/* --- Fix hero text overlap on mobile --- */
-@media (max-width: 768px) {
-  .hero-cover {
-    padding-top: 160px; /* push everything lower below topbar */
-    padding-bottom: 60px;
-    justify-content: flex-start; /* align from top instead of center */
-    min-height: 90vh; /* gives breathing room */
+/* --- FINAL FIX for hero text overlap on mobile (works on iOS Safari too) --- */
+@media only screen and (max-width: 768px) {
+  header.hero-cover {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important; /* force from top */
+    align-items: center !important;
+    padding-top: 180px !important;  /* push below topbar */
+    padding-bottom: 60px !important;
+    min-height: 95vh !important;  /* fill viewport height */
+    background-attachment: scroll !important;
+    background-position: center center !important;
   }
 
-  .hero-inner {
-    transform: translateY(20px); /* small visual adjustment */
+  header.hero-cover .hero-inner {
+    transform: translateY(20px) !important;
+    z-index: 1 !important;
   }
 }
