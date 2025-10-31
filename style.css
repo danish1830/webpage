@@ -277,3 +277,44 @@ body main.container section {
 body main.container .card {
   margin-bottom: 0;  /* remove extra bottom margin inside each section */
 }
+
+
+.img-card {
+  display: block !important;
+  width: 100% !important;
+  max-width: 900px !important;
+  height: auto !important;
+  margin: 16px auto !important;
+  border-radius: 14px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+/* === Make Thesis card same width as other cards === */
+#thesis .card {
+  max-width: 100%;   /* remove the artificial limit */
+  margin: 0 auto;    /* keep it centered */
+}
+
+#thesis {
+  padding: 56px 0; /* same vertical rhythm as others */
+}
+
+/* === FINAL — consistent thesis image sizing === */
+#thesis .img-card {
+  display: block;
+  margin: 24px auto;
+  width: 95%;        /* fills most of the card */
+  max-width: 1100px; /* avoids extreme stretch on large screens */
+  height: auto;
+  border-radius: 14px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+#thesis .img-wrap img {
+  width: auto;             /* prevents forced stretch */
+  max-width: 900px;        /* cap image width */
+  height: auto;
+  display: block;
+  border-radius: 14px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
