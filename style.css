@@ -326,3 +326,121 @@ body main.container .card {
   gap: 10px; /* spacing between buttons */
 }
 
+/* ======= UNIVERSAL RESPONSIVE DESIGN ======= */
+
+/* Tablets (<=1024px): tighten layout but keep grids */
+@media (max-width: 1024px) {
+  .container {
+    padding: 40px 28px;
+  }
+  .grid {
+    gap: 24px;
+  }
+  .card {
+    padding: 28px 30px;
+  }
+}
+
+/* Phones (<=768px): switch to single column layout */
+@media (max-width: 768px) {
+  /* General container spacing */
+  .container {
+    padding: 32px 20px;
+  }
+
+  /* Grid: single column everywhere */
+  .grid {
+    grid-template-columns: 1fr !important;
+    gap: 24px;
+  }
+
+  /* Cards: slightly smaller padding */
+  .card {
+    padding: 22px 24px;
+    border-radius: 16px;
+  }
+
+  /* Font sizes (balanced readability) */
+  h1 {
+    font-size: 1.9rem;
+    line-height: 1.2;
+  }
+  h2 {
+    font-size: 1.35rem;
+  }
+  h3 {
+    font-size: 1.1rem;
+  }
+  body {
+    font-size: 15.5px;
+    line-height: 1.6;
+  }
+
+  /* Buttons stack full width */
+  .btn {
+    width: 100%;
+    justify-content: center;
+    padding: 10px 0;
+    font-size: 15px;
+  }
+  .pill-links {
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  /* Hero image simpler on mobile */
+  .hero-cover {
+    min-height: 60vh;
+    background-attachment: scroll;
+    background-position: center center;
+  }
+  .site-title {
+    font-size: clamp(36px, 9vw, 60px);
+  }
+
+  /* About, Work, Contact all single column */
+  #about .grid,
+  #work .grid,
+  #contact .grid {
+    grid-template-columns: 1fr !important;
+    gap: 24px;
+  }
+
+  /* Thesis section image scaling */
+  #thesis .img-card {
+    width: 100%;
+    max-width: 100%;
+    margin: 12px 0;
+  }
+
+  /* Certifications layout stack */
+  .cert-list li {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 15px;
+  }
+
+  /* Footer smaller and tighter */
+  footer {
+    font-size: 14px;
+    padding: 18px 0;
+  }
+}
+
+/* Small phones (<=480px): compact everything */
+@media (max-width: 480px) {
+  body {
+    font-size: 14.5px;
+  }
+  h1 {
+    font-size: 1.6rem;
+  }
+  .card {
+    padding: 18px 20px;
+  }
+  .btn {
+    font-size: 14px;
+  }
+}
