@@ -158,13 +158,19 @@ footer{ margin-top:40px; padding:24px 0; border-top:1px solid var(--line); color
   text-shadow:0 12px 36px rgba(0,0,0,.45);
 }
 .site-subtitle {
-  margin: 10px 0 0;
-  font-size: clamp(20px, 3.2vw, 36px);
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.92);
-  text-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  font-size: clamp(28px, 3.5vw, 52px); /* 🔹 larger name */
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 6px 28px rgba(0, 0, 0, 0.45);
+  margin-top: 10px;
 }
-
+.site-subsubtitle {
+  font-size: clamp(18px, 2vw, 28px);
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  margin-top: 6px;
+}
 
 /* Hero top bar (links + buttons) */
 .hero-topbar{
