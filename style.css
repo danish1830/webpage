@@ -444,3 +444,22 @@ body main.container .card {
     font-size: 14px;
   }
 }
+
+/* Fix centering for single buttons inside pill-links (like More Details) */
+.pill-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* centers all buttons horizontally */
+  gap: 10px;
+  margin-top: 16px;
+}
+
+/* Keep it tidy on small screens */
+@media (max-width: 768px) {
+  .pill-links {
+    flex-direction: column;
+    align-items: center;  /* center vertically stacked buttons */
+    gap: 12px;
+  }
+}
+
