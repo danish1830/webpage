@@ -54,7 +54,7 @@
   <div class="grid">
     <!-- Full-width About box -->
     <div class="card fullwidth">
-      <h2>About Me</h2>
+      <h2 style="color: #2563EB;">About Me</h2>
       <p>I am a recent graduate of the <em>Erasmus Mundus</em> Master’s in Marine Environment, a joint international program between 
         <em>Université de Bordeaux (France)</em>, <em>Universidad del País Vasco (Spain)</em>, 
         and <em>Université de Liège (Belgium)</em>. My academic background bridges marine and climate sciences, combining 
@@ -69,7 +69,7 @@
 
     <!-- Left column below -->
     <div class="card">
-      <h2>Skills Snapshot</h2>
+      <h2 style="color: #2563EB;">Skills Snapshot</h2>
       <ul class="list-plain">
         <li><strong>Programming:</strong> Python, R, Julia</li>
         <li><strong>Modelling:</strong> Building model-frameworks, empirical-statistical downscaling</li>
@@ -80,7 +80,7 @@
 
     <!-- Right column below -->
     <div class="card">
-      <h2>Research Interests</h2>
+      <h2 style="color: #2563EB;">Research Interests</h2>
       <ul>
         <li>Ocean–Atmosphere Dynamics</li>
         <li>Cryosphere–Ocean Interactions</li>
@@ -96,8 +96,10 @@
     <!-- THESIS -->
     <section id="thesis">
       <div class="card">
-        <h2>Master Thesis</h2>
+        <h2 style="color: #2563EB;">Master Thesis</h2>
         <img src="Images/Cumulative_Ba_Time_Series.png" class="img-card" alt="Schematic of modelling routine"></img>
+        
+        <h3 style="margin-top: 16px; color: #ca0020; text-align: center;"> "Detection and Explanation of Regime Shifts in the Climatic Controls of Norwegian Glaciers" </h3>
         <p class="lead">Click here for a detailed overview of the thesis project! </p>
 
         <p style="margin-top: 18px;">
@@ -118,12 +120,13 @@
     
     <!-- RESEARCH / PROJECTS -->
     <section id="work">
-      <h2>Selected Projects</h2>
+      <div class="card">
+      <h2 style="color: #2563EB;">Selected Projects</h2>
       <div class="grid">
         
         <article class="col-6 card">
-          <h3>Glacier Mass-balance Modelling (Norway)</h3>
-          <p>Perfect‑prognosis ESD to predict mass-balance components using ERA5 predictors & Regime‑Shift Analysis around the year 2000.</p>
+          <h3>Glacier Mass-balance Modelling </h3>
+          <p>Perfect‑prognosis based Empirical-Statistical Downscaling to predict mass-balance components.</p>
           <div class="pill-links">
     
           </div>
@@ -131,55 +134,24 @@
         
         <article class="col-6 card">
           <h3>Pattern Mining in Climate Fields</h3>
-          <p>EOF/PCA‑based teleconnection diagnostics; feature engineering for ML workflows; robust cross‑validation & feature selection.</p>
-        </article>
-        
-        <article class="col-6 card">
-          <h3>Remote Sensing & MHWs</h3>
-          <p>Exploratory SST retrieval and marine heatwave characterization; map design and scale‑aware visual summaries.</p>
-
-          <a class="btn" href=" https://drive.google.com/file/d/10zG1_SLOsyvnsGXjOOxKAyCg_JrHJSRv/view?usp=sharing" target="_blank" rel="noreferrer">📄 Document</a>
-          <a class="btn ghost" href="" target="_blank" rel="noreferrer">💻 Code</a>
-          
+          <p>EOF/PCA‑based teleconnection pattern mining.</p>
         </article>
         
         <article class="col-6 card">
           <h3>2D Diffusion Model</h3>
-          <p>Simulation of pollution patch using Finite Difference Method (FDM) with explicit and implicit numerical schemes (Neumann boundary conditions & optimized CFL constraints for stability).</p>
-
-          <a class="btn" href="https://drive.google.com/file/d/1MMMSRW8BcD5i67WL_GToM2pqPrGTUM9H/view?usp=sharing" target="_blank" rel="noreferrer">📄 Document</a>
-          <a class="btn ghost" href="https://drive.google.com/file/d/1RO5JuIvx4_zhuIkQrxLdXAnrKnGZcIdH/view?usp=sharing" target="_blank" rel="noreferrer">🖼️ Slides</a>
-          <a class="btn" href="" target="_blank" rel="noreferrer">💻 Code</a>
+          <p>Simulation of pollution patch using Finite Difference Method (FDM).</p>
           
         </article>
 
         <article class="col-6 card">
-          <h3>Sertraline Toxicity Bioassay</h3>
-          <ul>
-            <li>Designed an acute toxicity bioassay as part of a team to assess the toxicity of the anti-depressant Sertraline (SRT) on marine copepods <em>(Acartia tonsa)</em> over 24h and 48h exposure.</li>
-            <li>Conducted several statistical analyses (ANOVA, Probit analysis) & time-dependent mortality tests using R and IBM SPSS.</li>
-          </ul>
-          <div class="pill-links">
-
-          <a class="btn" href="https://drive.google.com/file/d/1x12a8K6138kY0hcasuruUA14eQA7nFzA/view?usp=sharing" target="_blank" rel="noreferrer">📄 Document</a>
-          <a class="btn ghost" href="https://drive.google.com/file/d/14Q4AIr37IAHnBqn1LyTZZB50ywuk0DUG/view?usp=sharing" target="_blank" rel="noreferrer">🖼️ Poster</a>
-
+          <h3>Remote Sensing & MHWs</h3>
+          <p>Exploratory SST retrieval and marine heatwave characterization.</p>
+          
         </article>
 
-
-        <article class="col-6 card">
-          <h3>NPZDO₂ Biogeochemical Model</h3>
-          <ul>
-            <li>Developed a extended NPZDO₂ biogeochemical model to simulate the dynamics of nutrients in aquatic systems.</li>
-            <li>The framework model has oxygen dynamics for eutrophication management, nutrient speciation, & sediment interactions.</li>
-            <li>Implemented the model in R and conducted sensitivity analyses to assess the impact of key parameters on model output.</li>
-          </ul>
-          <div class="pill-links">
-
-          <a class="btn" href="https://drive.google.com/file/d/1TVaG9r3iNT9fluCzEPGdO_PVzWE7guts/view?usp=sharing" target="_blank" rel="noreferrer">📄 Document</a>
-          <a class="btn ghost" href="" target="_blank" rel="noreferrer">💻 Code</a>
-
-        </article>
+          <p style="margin-top: 18px;">
+            <a class="btn" href="projects.html">🔍 More Details</a>
+          </p>
 
 
       </div>
@@ -189,9 +161,9 @@
 
     <!-- PUBLICATIONS -->
     <section id="pubs">
-      <h2>Publications (Coming Soon!)</h2>
       <div class="card">
-        <p>In progress: preparing a publication based on the Master’s thesis findings for submission to a relevant Q1 journal such as <em>Journal of Glaciology</em> or <em>The Cryosphere</em>.</p>
+        <h2 style="color: #2563EB;">Publications (Coming Soon!)</h2>
+        <p>In progress: preparing a publication based on the Master’s thesis findings for submission to a relevant Q1 journal (<em>The Cryosphere</em>).</p>
       </div>
     </section>
 
@@ -199,7 +171,7 @@
     <!-- CERTIFICATIONS -->
   <section id="certifications">
     <div class="card">
-      <h2>Certifications</h2>
+      <h2 style="color: #2563EB;">Certifications</h2>
       <ul class="cert-list">
         <li>
           <span>Oil & Gas Industry Operations and Markets- Duke University (Coursera)</span>
@@ -218,7 +190,7 @@
     <section id="contact">
       <div class="grid">
         <div class="col-6 card">
-          <h2>Contact</h2>
+          <h2 style="color: #2563EB;">Contact</h2>
           <p>Open to PhD opportunities in climate/ocean dynamics, ML for Earth :) !</p>
           <ul>
             <li>Email: <a href="mailto:danish.science@outlook.com">danish.science@outlook.com</a></li>
@@ -226,7 +198,7 @@
           </ul>
         </div>
         <div class="col-6 card" id="cv">
-          <h2>CV</h2>
+          <h2 style="color: #2563EB;">CV</h2>
           
           <a class="btn" href="Files/Danish_CV_PhD.pdf" target="_blank" rel="noreferrer">⬇️ Download CV</a>
         </div>

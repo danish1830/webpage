@@ -18,7 +18,7 @@
     <!-- === HEADER SECTION === -->
     <section>
       <a href="index.html" class="btn ghost">← Back to Home</a>
-      <h1>Master Thesis</h1>
+      <h1 style="color: #2563EB;">Master Thesis</h1>
 
       <div class="card">
         <h2>"Detection and Explanation of Regime Shifts in the Climatic Controls of Norwegian Glaciers"</h2>
@@ -32,7 +32,7 @@
     <!-- === AIM === -->
     <section>
       <div class="card">
-        <h2>Aim</h2>
+        <h2>Aim:</h2>
         <ul>
             <li> Detect & explain regime shifts in glacier–climate relationships (pre-2000 vs post-2000). </li>
             <li> Develop an empirical-statistical model framework for glacier mass balance. </li>
@@ -43,14 +43,14 @@
     <!-- === Hypothesis === -->
     <section>
       <div class="card">
-        <h2>Hypothesis</h2>
+        <h2>Hypothesis:</h2>
         <p>"The turn of the century marks the transition to a new glacier regime, characterized by a change in the climatic controls on annual mass balances.</p>
       </div>
     </section>
 
     <section>
     <div class="card">
-        <h2>Figure: Drastic decrease in Mass balance in 2000</h2>
+        <h2>Figure: Drastic decrease in Mass balance post-2000</h2>
         <img src="Images/Cumulative_Ba_Time_Series.png" class="img-card">
         <p><em> Cumulative Ba (m w.e.) for 11 Norwegian glaciers from 1950 to 2020. The dashed vertical line
         at the year 2000 indicates a marked acceleration in cumulative mass loss for most glaciers after 2000.
@@ -62,21 +62,21 @@
     <!-- === METHODS === -->
     <section>
       <div class="card">
-        <h2>Methods</h2>
+        <h2>Methods:</h2>
         <p> Data sources: ERA5 reanalysis (ECMWF), CMIP6 projections, and glacier mass-balance observations (NVE: Norwegian Water Resources and Energy Directorate).</p>
 
         <p> Part A:
             <ul>
                 <li>Exploratory data analysis of glacier mass-balance time series (1950–2023).</li>
-                <li>Empirical Orthogonal Function (EOF) analysis to identify dominant modes of variability.</li>
-                <li>Detection of regime shifts using correlation testing, moving-window analyses, and comparing pre-2000 & post-2000 periods.</li>
+                <li>Empirical Orthogonal Function (EOF) analysis to identify dominant modes of variability (e.g., NAO, EA, SCAN).</li>
+                <li>Detection of regime shifts using correlation testing and comparing pre-2000 & post-2000 periods.</li>
             </ul>
         </p>
         <p>
             Part B:
             <ul>
-                <li>Predictor selection using Recursive & Tree-based selection and ensemble cross-validation.</li>
-                <li>Empirical-Statistical Downscaling via <code>pyESD</code> framework with 6 regressors (ARD, RidgeCV, RandomForest, Bagging, Stacking) & 3 selectors (Recursive, Tree-Based, Sequential).</li>
+                <li>Predictor selection followed by training and testing different models with cross-validation.</li>
+                <li>Empirical-Statistical Downscaling via a <code>pyESD</code> based ML framework with 6 regressor (ARD, RidgeCV, RandomForest, Bagging, Stacking) & 3 selector (Recursive, Tree-Based, Sequential) techniques.</li>
                 <li>Model evaluation using cross-validation and performance metrics (e.g., RMSE, R²).</li>
             </ul>
         </p>
@@ -99,7 +99,7 @@
     <!-- === RESULTS === -->
     <section>
       <div class="card">
-        <h2>Results & Findings</h2>
+        <h2>Results & Findings:</h2>
         <p> Part A: </p>
         <ul>
           <li>Identified a major regime shift around 2000 for most glaciers.</li>

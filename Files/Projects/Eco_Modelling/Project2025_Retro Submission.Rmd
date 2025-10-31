@@ -1,0 +1,2579 @@
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Load required packages
+require(deSolve)
+require(marelac)
+require(diagram)
+require(FME)
+require(ggplot2)
+require(tidyr)
+```
+#####################################
+## TASK 4 & 5
+#####################################
+
+# Model description
+## The model Parameters
+```{r}
+
+Parms <- c(
+  depth         = 5,        # [m ] depth of the bay
+  arrheniusCt   = 1.07,     #   -  Temperature Dependency of Process rates 
+ 
+  #Physical parameters                                                
+  salinity                    = 34,     #           - 
+  TempTrend                 =0., #Temperature estimated trend
+ 
+ #Phytoplankton
+  maxUptake      = 1., # [/day] Maximum uptake rate 
+  ksPAR          = 55., # [W/m2] half-saturation coefficient for light
+  ksDIN          = 1.0, # [mmolN/m3] half-saturation coefficient for nutrient
+  kd             = 0.1,     # /m   Light extinction coefficient
+  ChlNratio     = 1, # mgChla/mmolN
+  RespFrac       = 0.3, #Fraction of the uptake that is respired
+  mortalityRatePHYTO =0.05, #Natural lysis of phytoplankton 
+  
+ #Zooplankton
+  maxGrazing    = 1.0,  # [/day] Maximum Grazing rate
+  ksGrazing     = 1.0, # [mmolN/m3] half-saturation coefficient for nutrient
+  pFaeces       = 0.3,  # [-]
+  excretionRate = 0.1, # [/day]
+  mortalityRateZOO = 0.4, # [/(mmolN/m3)/day]
+  
+  #Remineralisation 
+  mineralisationRate = 0.1, # [/day]
+  ONratio =0.16, #molO2/molN, Oxygen to nitrogen ratio of organic matter
+  
+  #Mimic eutrophication by adding a flux of detritus and DIN
+  DilRate=0.05, #Dilution rate /day
+  DET_River=10., #Concentration of detritus in the rivers in mmolN/m3
+  DIN_River=10. #Concentration of DIN in the rivers in mmolN/m3
+)
+
+```
+
+## State variables
+
+State variables are explicitly described in the model by differential equations. They need to be given a name and an initial value. All concentrations are expressed in mol C/m2.
+```{r}
+States <- c(DIN       = 2.5,   # mmolN/m3  initial concentration of dissolved inorganic nitrogen  
+            PHYTO     = 0.05,   # mmolN/m3 initial phytoplankton biomass  
+            ZOO       = 0.03,   # mmolNm3   initial zooplankton biomass 
+            DET       = 0.5,    # mmolN/m3  initial detritus concentration
+            DOX       = 240)  # mmolO2/m3   initial oxygen concentration
+            
+```
+
+## forcing functions
+```{r}
+data.temperature <- read.table(file = "Forcings/Temperature_DailyAveraged.txt", skip=1, header=TRUE)  
+data.light <- read.table(file = "Forcings/SolarRadiation_DailyAveraged.txt", 
+                                 skip=1, header=TRUE)  
+data.wind  <- read.table(file = "Forcings/Wind_MeteoStation.txt", skip=1, header=TRUE) 
+
+ftemperature     <- approxfun(x = data.temperature[,2], y = data.temperature[,3], rule = 2)
+flight           <- approxfun(x = data.light[,2], y = data.light[,3], rule = 2)
+fwind            <- approxfun(x = data.wind[,2], y = data.wind[,3], rule = 2)
+
+Day<-trunc(data.wind[,2])
+Wind<-tapply(data.wind[,3],INDEX=Day,FUN=mean)
+fwind<-approxfun(x=0:365,y=Wind,rule=2)
+
+```
+
+## observations
+```{r}
+data.oxygen   <- read.table(file = "Data/Oxygen_DailyAveraged.txt", skip=1, header=TRUE)  
+
+```
+
+## The model function
+```{r }
+NPZDO2 <- function(t, y, parms)
+ {
+ with(as.list(c(y, parms)),{
+
+# Initialisation            
+
+# set forcing functions  
+  Light       <- flight(t)           # determines photosynthesis
+  Wind        <- fwind(t)            # modulates the air-sea exchange
+  Temperature <- ftemperature(t) +TempTrend     # affects biological rates and air-sea exchange 
+  Salinity<-salinity
+
+# Photosynthesis depends on the light, light decreases with water depth, not all light is PAR
+ 
+  PAR <- 0.5*Light *exp(-kd*(depth)) # 50% of light in par,   
+
+#  All rates are expressed at 18 dg - Tempfac = the factor of increase with temperature
+  Tempfac <- arrheniusCt ^ (Temperature-18.)
+  
+# The biological rates  
+
+
+# Rate expressions - all in units of [mmolN/m3/day]
+    DINuptake <- Tempfac*maxUptake * PAR/(PAR+ksPAR) * DIN/(DIN+ksDIN)*PHYTO
+    Grazing   <- Tempfac*maxGrazing* PHYTO/(PHYTO+ksGrazing)*ZOO
+    Faeces    <- pFaeces * Grazing
+    ZooGrowth <- (1-pFaeces) * Grazing
+    Excretion <- Tempfac*excretionRate * ZOO
+    MortalityZOO <- Tempfac*mortalityRateZOO * ZOO * ZOO
+    MortalityPHYTO <- Tempfac*mortalityRatePHYTO * PHYTO
+    Mineralisation <- Tempfac*mineralisationRate * DET
+    
+# Oxygen dynamics   
+# Rate expressions - all in units of [mmolO2/m3/day]
+    Respiration <- (Mineralisation+Excretion+DINuptake*RespFrac)*ONratio
+    GrossPhotosynthesis <- DINuptake*ONratio
+#Net Oxygen production
+    NetO2Prod <-GrossPhotosynthesis-Respiration
+    
+# Atmospheric air-sea exchange   
+Piston         <- gas_transfer(t = Temperature, u10 = Wind, species = "O2")*86400  # m/d
+
+#Compute the saturation constant of oxygen
+Satox          <- gas_O2sat(S = Salinity, t = Temperature) / molweight("O2") #in mol/m3
+   
+#convert from mol/m3 in mmol/m3
+Satox<-Satox*1000  
+
+#if the water is undersaturated (i.e. Satox>DOX) (resp. over, ie. Satox<DOX) then the AirSeaExchange will be positive (resp. negative), water will gain (resp. loose) oxygen.    
+ 
+AirSeaExchange <- Piston*(Satox - DOX)   # mmol O2 / m2 / d, 
+
+#Percentage of Saturation
+DOXSat<-DOX/Satox*100
+
+# Sign of saturation
+OxDIFF<-Satox - DOX
+
+#Mimic Eutrophication: add river inputs of DIN and DET
+RiverDIN<-DilRate*DIN_River
+RiverDET<-DilRate*DET_River
+
+
+# The rate of change of state variables !
+
+# Mass balances [mmolN/m3/day]
+
+## CASE: Wihtout lateral transport
+
+   dDIN      <- Mineralisation + Excretion - DINuptake 
+   dPHYTO    <- DINuptake - Grazing -MortalityPHYTO
+   dZOO      <- ZooGrowth - Excretion - MortalityZOO
+   dDET      <- MortalityZOO +MortalityPHYTO - Mineralisation + Faeces  
+   
+## CASE: EUTROPHICATION With lateral transport and rivers
+   
+  #dDIN      <- Mineralisation + Excretion - DINuptake +RiverDIN -DilRate*DIN
+  #dPHYTO    <- DINuptake - Grazing -MortalityPHYTO - DilRate*PHYTO
+  #dZOO      <- ZooGrowth - Excretion - MortalityZOO-DilRate*ZOO
+  #dDET      <- MortalityZOO +MortalityPHYTO- Mineralisation + Faeces +RiverDET -DilRate*DET
+
+## Oxygen balances [mmolO2/m3/day]
+
+#CASE: SURFACE
+dDOX  <-NetO2Prod + AirSeaExchange/depth   
+
+#CASE: UNDERWATER
+#dDOX  <-NetO2Prod
+
+# Total nitrogen in the system in mmolN/m3
+TotalN <- DIN+PHYTO+ZOO+DET 
+    
+#Chlorophyll in mgChla/m3    
+Chlorophyll<-PHYTO*ChlNratio  
+    
+# # The model function must first return the rates of the state variables 
+# (in the order in which they are defined) -  then the ordinary variables are returned
+    return (list(c(dDIN, dPHYTO, dZOO, dDET,dDOX),   # the rates of change
+                   TotalN = TotalN, Chlorophyll=Chlorophyll, # ordinary output variables
+                   AirSeaExchange = AirSeaExchange, 
+                   Satox=Satox, 
+                 OxDIFF=OxDIFF,
+                 DOXSat=DOXSat,
+                   Temperature = Temperature,
+                   Wind = Wind,
+                   PAR = PAR,
+                   DINuptake=DINuptake,
+                   Grazing=Grazing,
+                   Excretion=Excretion,
+                   ZooGrowth=ZooGrowth,
+                   MortalityPHYTO=MortalityPHYTO,
+                 MortalityZOO=MortalityZOO,
+                   Mineralisation=Mineralisation,
+                   Faeces=Faeces,
+                 GrossPhotosynthesis=GrossPhotosynthesis,
+                 Respiration=Respiration,
+                 NetO2Prod=NetO2Prod)                  
+           )
+    })
+  }  # end of model equations
+
+```
+
+# Model run
+```{r}
+NYEARS <- 1. # number of years of integration
+dt     <- 1. # time step
+times  <- seq(from = 0, to = NYEARS*365, by = dt)
+
+```
+
+## Solving the model
+```{r}
+  P    <- ode   (y        = States,
+                 times    = times,
+                 func     = NPZDO2,
+                 parms    = Parms )
+```
+
+## Plotting output variables and state variables
+
+# This chunk is to prepare the data to use ggplot2. Using ggplot 2 requres the data to be in the form of a data frame.
+```{r}
+
+library(tidyr)
+# Converting the model data (P) into a data frame
+P_df <- as.data.frame(P)
+# Adding the time column to data
+P_df$time <- times  
+# Reshaping the data into a "long" format for ggplot2
+P_long <- pivot_longer(
+    P_df,
+    cols = -time,  # this is to use all columns except 'time'
+    names_to = "Variable",  # Name the column for parameters
+    values_to = "Value"     # Name the column for values
+)
+```
+
+# This is just to check if the transformation to data frame to use ggplot2 did not alter the original dataset
+```{r}
+
+all.equal(P[, "DOXSat.O2"], subset(P_long, Variable == "DOXSat.O2")$Value)
+
+head(P[, "DOXSat.O2"])  
+
+```
+
+# This chunk is to plot with ggplot2:
+```{r, fig.width = 10, fig.height=9}
+par(mfrow=c(4,3))
+
+ggplot(P_long, aes(x = time, y = Value)) +
+    geom_line(aes(color = Variable)) +
+    facet_wrap(~Variable, scales = "free_y", ncol = 5) +  
+    scale_color_manual(values = rainbow(length(unique(P_long$Variable)))) +  
+    ggtitle("Model Parameters v/s Time") +  
+    xlab("Time (days)") +  
+    ylab("Value") +  
+    theme(
+        strip.text = element_text(size = 10),  
+        axis.text.x = element_text(angle = 90, hjust = 1),  
+        panel.grid.major = element_line(color = "gray90"),  
+        panel.background = element_rect(fill = "white"),  
+        legend.position = "none" 
+    )
+```
+
+```{r}
+# This is just to maintain homogenity. I use the same hex codes for the individual subplots in the previous chunk; copy paste the relevant hex code based on the color used in the main plot to generate subplots.
+
+num_variables <- length(unique(P_long$Variable))  # Number of unique variables
+variable_colors <- rainbow(num_variables)        # Generate the rainbow palette
+
+print(variable_colors)
+
+```
+
+```{r, fig.width = 3.5, fig.height=3.5}
+# While using ggplot2; I was facing an issue where the command "facetwrap" organizes the plots in the small-multiple format but it does not label the x-axis for each subplot. So to have a plot with a labelled x axis, I individually plot the variables I need in the report to make my argument. 
+
+#Subset data for one variable (e.g., "PHYTO")
+single_variable_data <- subset(P_long, Variable == "DIN")
+library(ggplot2)
+# Creating the plot
+ggplot(single_variable_data, aes(x = time, y = Value)) +
+  geom_line(color = "#FFB800", size = 1) +  
+  labs(
+    title = "DIN",
+    x = "Time (days)",
+    y = "Value"
+  ) +
+  theme_minimal() +  
+  theme(
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12),
+    axis.text = element_text(size = 10),
+    panel.grid.major = element_line(color = "gray90"),
+    panel.background = element_rect(fill = "white")
+  )
+
+```
+
+## Comparison with Observations
+```{r, fig.width = 7, fig.height=3}
+
+# converting into a single data frame
+oxygen_data <- data.frame(
+  Time = c(times, data.oxygen[, 2]),
+  Oxygen = c(P[, 6], 1000 * data.oxygen[, 3]),
+  Type = c(rep("model", length(times)), rep("data", nrow(data.oxygen)))
+)
+
+ggplot(oxygen_data, aes(x = Time, y = Oxygen, color = Type)) +
+  geom_line(data = subset(oxygen_data, Type == "model"), size = 0.75, ) +
+  geom_point(data = subset(oxygen_data, Type == "data"), size = 0.5, ) +
+  labs(
+    title = "Oxygen in mmol O2/m3",
+    x = "Days",
+    y = "Oxygen, mmol O2/m3"
+  ) +
+  scale_color_manual(values=c("model"="black", "data"="red")) +
+  scale_y_continuous(limits = c(200, 280)) +
+  theme_minimal() + 
+  theme(legend.position = "right",  
+        legend.title = element_text(size = 12, face = "bold"),  
+        legend.text = element_text(size = 10),
+        panel.border = element_rect(color = "black", fill = NA, size = 1)
+        )   
+```
+#####################################
+## TASK 6: setting temptrend=1 to mimic warming.
+#####################################
+```{r}
+
+Parms <- c(
+  depth         = 5,        # [m ] depth of the bay
+  arrheniusCt   = 1.07,     #   -  Temperature Dependency of Process rates 
+ 
+  #Physical parameters                                                
+  salinity                    = 34,     #           - 
+  TempTrend                 =1., #Temperature estimated trend
+ 
+ #Phytoplankton
+  maxUptake      = 1., # [/day] Maximum uptake rate 
+  ksPAR          = 55., # [W/m2] half-saturation coefficient for light
+  ksDIN          = 1.0, # [mmolN/m3] half-saturation coefficient for nutrient
+  kd             = 0.1,     # /m   Light extinction coefficient
+  ChlNratio     = 1, # mgChla/mmolN
+  RespFrac       = 0.3, #Fraction of the uptake that is respired
+  mortalityRatePHYTO =0.05, #Natural lysis of phytoplankton 
+  
+ #Zooplankton
+  maxGrazing    = 1.0,  # [/day] Maximum Grazing rate
+  ksGrazing     = 1.0, # [mmolN/m3] half-saturation coefficient for nutrient
+  pFaeces       = 0.3,  # [-]
+  excretionRate = 0.1, # [/day]
+  mortalityRateZOO = 0.4, # [/(mmolN/m3)/day]
+  
+  #Remineralisation 
+  mineralisationRate = 0.1, # [/day]
+  ONratio =0.16, #molO2/molN, Oxygen to nitrogen ratio of organic matter
+  
+  #Mimic eutrophication by adding a flux of detritus and DIN
+  DilRate=0.05, #Dilution rate /day
+  DET_River=10., #Concentration of detritus in the rivers in mmolN/m3
+  DIN_River=10. #Concentration of DIN in the rivers in mmolN/m3
+)
+
+```
+## State variables
+
+State variables are explicitly described in the model by differential equations. They need to be given a name and an initial value. All concentrations are expressed in mol C/m2.
+```{r}
+States <- c(DIN       = 2.5,   # mmolN/m3  initial concentration of dissolved inorganic nitrogen  
+            PHYTO     = 0.05,   # mmolN/m3 initial phytoplankton biomass  
+            ZOO       = 0.03,   # mmolNm3   initial zooplankton biomass 
+            DET       = 0.5,    # mmolN/m3  initial detritus concentration
+            DOX       = 240)  # mmolO2/m3   initial oxygen concentration
+            
+```
+
+## forcing functions
+```{r}
+data.temperature <- read.table(file = "Forcings/Temperature_DailyAveraged.txt", skip=1, header=TRUE)  
+data.light <- read.table(file = "Forcings/SolarRadiation_DailyAveraged.txt", 
+                                 skip=1, header=TRUE)  
+data.wind  <- read.table(file = "Forcings/Wind_MeteoStation.txt", skip=1, header=TRUE) 
+
+ftemperature     <- approxfun(x = data.temperature[,2], y = data.temperature[,3], rule = 2)
+flight           <- approxfun(x = data.light[,2], y = data.light[,3], rule = 2)
+fwind            <- approxfun(x = data.wind[,2], y = data.wind[,3], rule = 2)
+
+Day<-trunc(data.wind[,2])
+Wind<-tapply(data.wind[,3],INDEX=Day,FUN=mean)
+fwind<-approxfun(x=0:365,y=Wind,rule=2)
+
+```
+
+## observations
+```{r}
+data.oxygen   <- read.table(file = "Data/Oxygen_DailyAveraged.txt", skip=1, header=TRUE)  
+
+```
+
+## The model function
+```{r }
+NPZDO2 <- function(t, y, parms)
+ {
+ with(as.list(c(y, parms)),{
+
+# Initialisation            
+
+# set forcing functions  
+  Light       <- flight(t)           # determines photosynthesis
+  Wind        <- fwind(t)            # modulates the air-sea exchange
+  Temperature <- ftemperature(t) +TempTrend     # affects biological rates and air-sea exchange 
+  Salinity<-salinity
+
+# Photosynthesis depends on the light, light decreases with water depth, not all light is PAR
+ 
+  PAR <- 0.5*Light *exp(-kd*(depth)) # 50% of light in par,   
+
+#  All rates are expressed at 18 dg - Tempfac = the factor of increase with temperature
+  Tempfac <- arrheniusCt ^ (Temperature-18.)
+  
+# The biological rates  
+
+
+# Rate expressions - all in units of [mmolN/m3/day]
+    DINuptake <- Tempfac*maxUptake * PAR/(PAR+ksPAR) * DIN/(DIN+ksDIN)*PHYTO
+    Grazing   <- Tempfac*maxGrazing* PHYTO/(PHYTO+ksGrazing)*ZOO
+    Faeces    <- pFaeces * Grazing
+    ZooGrowth <- (1-pFaeces) * Grazing
+    Excretion <- Tempfac*excretionRate * ZOO
+    MortalityZOO <- Tempfac*mortalityRateZOO * ZOO * ZOO
+    MortalityPHYTO <- Tempfac*mortalityRatePHYTO * PHYTO
+    Mineralisation <- Tempfac*mineralisationRate * DET
+    
+# Oxygen dynamics   
+# Rate expressions - all in units of [mmolO2/m3/day]
+    Respiration <- (Mineralisation+Excretion+DINuptake*RespFrac)*ONratio
+    GrossPhotosynthesis <- DINuptake*ONratio
+#Net Oxygen production
+    NetO2Prod <-GrossPhotosynthesis-Respiration
+    
+# Atmospheric air-sea exchange   
+Piston         <- gas_transfer(t = Temperature, u10 = Wind, species = "O2")*86400  # m/d
+
+#Compute the saturation constant of oxygen
+Satox          <- gas_O2sat(S = Salinity, t = Temperature) / molweight("O2") #in mol/m3
+   
+#convert from mol/m3 in mmol/m3
+Satox<-Satox*1000  
+
+#if the water is undersaturated (i.e. Satox>DOX) (resp. over, ie. Satox<DOX) then the AirSeaExchange will be positive (resp. negative), water will gain (resp. loose) oxygen.    
+ 
+AirSeaExchange <- Piston*(Satox - DOX)   # mmol O2 / m2 / d, 
+
+#Percentage of Saturation
+DOXSat<-DOX/Satox*100
+
+# Sign of saturation
+OxDIFF<-Satox - DOX
+
+#Mimic Eutrophication: add river inputs of DIN and DET
+RiverDIN<-DilRate*DIN_River
+RiverDET<-DilRate*DET_River
+
+
+# The rate of change of state variables !
+
+# Mass balances [mmolN/m3/day]
+
+## CASE: Wihtout lateral transport
+
+   dDIN      <- Mineralisation + Excretion - DINuptake 
+   dPHYTO    <- DINuptake - Grazing -MortalityPHYTO
+   dZOO      <- ZooGrowth - Excretion - MortalityZOO
+   dDET      <- MortalityZOO +MortalityPHYTO - Mineralisation + Faeces  
+   
+## CASE: EUTROPHICATION With lateral transport and rivers
+   
+  #dDIN      <- Mineralisation + Excretion - DINuptake +RiverDIN -DilRate*DIN
+  #dPHYTO    <- DINuptake - Grazing -MortalityPHYTO - DilRate*PHYTO
+  #dZOO      <- ZooGrowth - Excretion - MortalityZOO-DilRate*ZOO
+  #dDET      <- MortalityZOO +MortalityPHYTO- Mineralisation + Faeces +RiverDET -DilRate*DET
+
+## Oxygen balances [mmolO2/m3/day]
+
+#CASE: SURFACE
+dDOX  <-NetO2Prod + AirSeaExchange/depth   
+
+#CASE: UNDERWATER
+#dDOX  <-NetO2Prod
+
+# Total nitrogen in the system in mmolN/m3
+TotalN <- DIN+PHYTO+ZOO+DET 
+    
+#Chlorophyll in mgChla/m3    
+Chlorophyll<-PHYTO*ChlNratio  
+    
+# # The model function must first return the rates of the state variables 
+# (in the order in which they are defined) -  then the ordinary variables are returned
+    return (list(c(dDIN, dPHYTO, dZOO, dDET,dDOX),   # the rates of change
+                   TotalN = TotalN, Chlorophyll=Chlorophyll, # ordinary output variables
+                   AirSeaExchange = AirSeaExchange, 
+                   Satox=Satox, 
+                 OxDIFF=OxDIFF,
+                 DOXSat=DOXSat,
+                   Temperature = Temperature,
+                   Wind = Wind,
+                   PAR = PAR,
+                   DINuptake=DINuptake,
+                   Grazing=Grazing,
+                   Excretion=Excretion,
+                   ZooGrowth=ZooGrowth,
+                   MortalityPHYTO=MortalityPHYTO,
+                 MortalityZOO=MortalityZOO,
+                   Mineralisation=Mineralisation,
+                   Faeces=Faeces,
+                 GrossPhotosynthesis=GrossPhotosynthesis,
+                 Respiration=Respiration,
+                 NetO2Prod=NetO2Prod)                  
+           )
+    })
+  }  # end of model equations
+
+```
+
+# Model run
+```{r}
+NYEARS <- 1. # number of years of integration
+dt     <- 1. # time step
+times  <- seq(from = 0, to = NYEARS*365, by = dt)
+
+```
+
+## Solving the model
+```{r}
+  P    <- ode   (y        = States,
+                 times    = times,
+                 func     = NPZDO2,
+                 parms    = Parms )
+```
+
+## Plotting output variables and state variables
+
+# This chunk is to prepare the data to use ggplot2. Using ggplot 2 requres the data to be in the form of a data frame.
+```{r}
+
+library(tidyr)
+# Converting the model data (P) into a data frame
+P_df <- as.data.frame(P)
+# Adding the time column to data
+P_df$time <- times  
+# Reshaping the data into a "long" format for ggplot2
+P_long <- pivot_longer(
+    P_df,
+    cols = -time,  # this is to use all columns except 'time'
+    names_to = "Variable",  # Name the column for parameters
+    values_to = "Value"     # Name the column for values
+)
+```
+# This chunk is to plot with ggplot2:
+```{r, fig.width = 10, fig.height=9}
+par(mfrow=c(4,3))
+
+ggplot(P_long, aes(x = time, y = Value)) +
+    geom_line(aes(color = Variable)) +
+    facet_wrap(~Variable, scales = "free_y", ncol = 5) +  
+    scale_color_manual(values = rainbow(length(unique(P_long$Variable)))) +  
+    ggtitle("Model Parameters v/s Time") +  
+    xlab("Time (days)") +  
+    ylab("Value") +  
+    theme(
+        strip.text = element_text(size = 10),  
+        axis.text.x = element_text(angle = 90, hjust = 1),  
+        panel.grid.major = element_line(color = "gray90"),  
+        panel.background = element_rect(fill = "white"),  
+        legend.position = "none" 
+    )
+```
+## Comparison with Observations
+```{r, fig.width = 7, fig.height=3}
+
+# converting into a single data frame
+oxygen_data <- data.frame(
+  Time = c(times, data.oxygen[, 2]),
+  Oxygen = c(P[, 6], 1000 * data.oxygen[, 3]),
+  Type = c(rep("model", length(times)), rep("data", nrow(data.oxygen)))
+)
+
+ggplot(oxygen_data, aes(x = Time, y = Oxygen, color = Type)) +
+  geom_line(data = subset(oxygen_data, Type == "model"), size = 0.75, ) +
+  geom_point(data = subset(oxygen_data, Type == "data"), size = 0.5, ) +
+  labs(
+    title = "Oxygen in mmol O2/m3",
+    x = "Days",
+    y = "Oxygen, mmol O2/m3"
+  ) +
+  scale_color_manual(values=c("model"="black", "data"="red")) +
+  scale_y_continuous(limits = c(200, 280)) +
+  theme_minimal() + 
+  theme(legend.position = "right",  
+        legend.title = element_text(size = 12, face = "bold"),  
+        legend.text = element_text(size = 10),
+        panel.border = element_rect(color = "black", fill = NA, size = 1)
+        )   
+```
+
+#####################################
+# TASK 7: Case of EUTROPHICATION with RiVER INPUT and Temptrend=0
+#####################################
+```{r}
+
+Parms <- c(
+  depth         = 5,        # [m ] depth of the bay
+  arrheniusCt   = 1.07,     #   -  Temperature Dependency of Process rates 
+ 
+  #Physical parameters                                                
+  salinity                    = 34,     #           - 
+  TempTrend                 =0., #Temperature estimated trend
+ 
+ #Phytoplankton
+  maxUptake      = 1., # [/day] Maximum uptake rate 
+  ksPAR          = 55., # [W/m2] half-saturation coefficient for light
+  ksDIN          = 1.0, # [mmolN/m3] half-saturation coefficient for nutrient
+  kd             = 0.1,     # /m   Light extinction coefficient
+  ChlNratio     = 1, # mgChla/mmolN
+  RespFrac       = 0.3, #Fraction of the uptake that is respired
+  mortalityRatePHYTO =0.05, #Natural lysis of phytoplankton 
+  
+ #Zooplankton
+  maxGrazing    = 1.0,  # [/day] Maximum Grazing rate
+  ksGrazing     = 1.0, # [mmolN/m3] half-saturation coefficient for nutrient
+  pFaeces       = 0.3,  # [-]
+  excretionRate = 0.1, # [/day]
+  mortalityRateZOO = 0.4, # [/(mmolN/m3)/day]
+  
+  #Remineralisation 
+  mineralisationRate = 0.1, # [/day]
+  ONratio =0.16, #molO2/molN, Oxygen to nitrogen ratio of organic matter
+  
+  #Mimic eutrophication by adding a flux of detritus and DIN
+  DilRate=0.05, #Dilution rate /day
+  DET_River=10., #Concentration of detritus in the rivers in mmolN/m3
+  DIN_River=10. #Concentration of DIN in the rivers in mmolN/m3
+)
+
+```
+## State variables
+
+State variables are explicitly described in the model by differential equations. They need to be given a name and an initial value. All concentrations are expressed in mol C/m2.
+```{r}
+States <- c(DIN       = 2.5,   # mmolN/m3  initial concentration of dissolved inorganic nitrogen  
+            PHYTO     = 0.05,   # mmolN/m3 initial phytoplankton biomass  
+            ZOO       = 0.03,   # mmolNm3   initial zooplankton biomass 
+            DET       = 0.5,    # mmolN/m3  initial detritus concentration
+            DOX       = 240)  # mmolO2/m3   initial oxygen concentration
+            
+```
+
+## forcing functions
+```{r}
+data.temperature <- read.table(file = "Forcings/Temperature_DailyAveraged.txt", skip=1, header=TRUE)  
+data.light <- read.table(file = "Forcings/SolarRadiation_DailyAveraged.txt", 
+                                 skip=1, header=TRUE)  
+data.wind  <- read.table(file = "Forcings/Wind_MeteoStation.txt", skip=1, header=TRUE) 
+
+ftemperature     <- approxfun(x = data.temperature[,2], y = data.temperature[,3], rule = 2)
+flight           <- approxfun(x = data.light[,2], y = data.light[,3], rule = 2)
+fwind            <- approxfun(x = data.wind[,2], y = data.wind[,3], rule = 2)
+
+Day<-trunc(data.wind[,2])
+Wind<-tapply(data.wind[,3],INDEX=Day,FUN=mean)
+fwind<-approxfun(x=0:365,y=Wind,rule=2)
+
+```
+
+## observations
+```{r}
+data.oxygen   <- read.table(file = "Data/Oxygen_DailyAveraged.txt", skip=1, header=TRUE)  
+
+```
+
+## The model function
+```{r }
+NPZDO2 <- function(t, y, parms)
+ {
+ with(as.list(c(y, parms)),{
+
+# Initialisation            
+
+# set forcing functions  
+  Light       <- flight(t)           # determines photosynthesis
+  Wind        <- fwind(t)            # modulates the air-sea exchange
+  Temperature <- ftemperature(t) +TempTrend     # affects biological rates and air-sea exchange 
+  Salinity<-salinity
+
+# Photosynthesis depends on the light, light decreases with water depth, not all light is PAR
+ 
+  PAR <- 0.5*Light *exp(-kd*(depth)) # 50% of light in par,   
+
+#  All rates are expressed at 18 dg - Tempfac = the factor of increase with temperature
+  Tempfac <- arrheniusCt ^ (Temperature-18.)
+  
+# The biological rates  
+
+
+# Rate expressions - all in units of [mmolN/m3/day]
+    DINuptake <- Tempfac*maxUptake * PAR/(PAR+ksPAR) * DIN/(DIN+ksDIN)*PHYTO
+    Grazing   <- Tempfac*maxGrazing* PHYTO/(PHYTO+ksGrazing)*ZOO
+    Faeces    <- pFaeces * Grazing
+    ZooGrowth <- (1-pFaeces) * Grazing
+    Excretion <- Tempfac*excretionRate * ZOO
+    MortalityZOO <- Tempfac*mortalityRateZOO * ZOO * ZOO
+    MortalityPHYTO <- Tempfac*mortalityRatePHYTO * PHYTO
+    Mineralisation <- Tempfac*mineralisationRate * DET
+    
+# Oxygen dynamics   
+# Rate expressions - all in units of [mmolO2/m3/day]
+    Respiration <- (Mineralisation+Excretion+DINuptake*RespFrac)*ONratio
+    GrossPhotosynthesis <- DINuptake*ONratio
+#Net Oxygen production
+    NetO2Prod <-GrossPhotosynthesis-Respiration
+    
+# Atmospheric air-sea exchange   
+Piston         <- gas_transfer(t = Temperature, u10 = Wind, species = "O2")*86400  # m/d
+
+#Compute the saturation constant of oxygen
+Satox          <- gas_O2sat(S = Salinity, t = Temperature) / molweight("O2") #in mol/m3
+   
+#convert from mol/m3 in mmol/m3
+Satox<-Satox*1000  
+
+#if the water is undersaturated (i.e. Satox>DOX) (resp. over, ie. Satox<DOX) then the AirSeaExchange will be positive (resp. negative), water will gain (resp. loose) oxygen.    
+ 
+AirSeaExchange <- Piston*(Satox - DOX)   # mmol O2 / m2 / d, 
+
+#Percentage of Saturation
+DOXSat<-DOX/Satox*100
+
+# Sign of saturation
+OxDIFF<-Satox - DOX
+
+#Mimic Eutrophication: add river inputs of DIN and DET
+RiverDIN<-DilRate*DIN_River
+RiverDET<-DilRate*DET_River
+
+
+# The rate of change of state variables !
+
+# Mass balances [mmolN/m3/day]
+
+## CASE: Wihtout lateral transport
+
+   #dDIN      <- Mineralisation + Excretion - DINuptake 
+   #dPHYTO    <- DINuptake - Grazing -MortalityPHYTO
+   #dZOO      <- ZooGrowth - Excretion - MortalityZOO
+   #dDET      <- MortalityZOO +MortalityPHYTO - Mineralisation + Faeces  
+   
+## CASE: EUTROPHICATION With lateral transport and rivers
+   
+  dDIN      <- Mineralisation + Excretion - DINuptake +RiverDIN -DilRate*DIN
+  dPHYTO    <- DINuptake - Grazing -MortalityPHYTO - DilRate*PHYTO
+  dZOO      <- ZooGrowth - Excretion - MortalityZOO-DilRate*ZOO
+  dDET      <- MortalityZOO +MortalityPHYTO- Mineralisation + Faeces +RiverDET -DilRate*DET
+
+## Oxygen balances [mmolO2/m3/day]
+
+#CASE: SURFACE
+dDOX  <-NetO2Prod + AirSeaExchange/depth   
+
+#CASE: UNDERWATER
+#dDOX  <-NetO2Prod
+
+# Total nitrogen in the system in mmolN/m3
+TotalN <- DIN+PHYTO+ZOO+DET 
+    
+#Chlorophyll in mgChla/m3    
+Chlorophyll<-PHYTO*ChlNratio  
+    
+# # The model function must first return the rates of the state variables 
+# (in the order in which they are defined) -  then the ordinary variables are returned
+    return (list(c(dDIN, dPHYTO, dZOO, dDET,dDOX),   # the rates of change
+                   TotalN = TotalN, Chlorophyll=Chlorophyll, # ordinary output variables
+                   AirSeaExchange = AirSeaExchange, 
+                   Satox=Satox, 
+                 OxDIFF=OxDIFF,
+                 DOXSat=DOXSat,
+                   Temperature = Temperature,
+                   Wind = Wind,
+                   PAR = PAR,
+                   DINuptake=DINuptake,
+                   Grazing=Grazing,
+                   Excretion=Excretion,
+                   ZooGrowth=ZooGrowth,
+                   MortalityPHYTO=MortalityPHYTO,
+                 MortalityZOO=MortalityZOO,
+                   Mineralisation=Mineralisation,
+                   Faeces=Faeces,
+                 GrossPhotosynthesis=GrossPhotosynthesis,
+                 Respiration=Respiration,
+                 NetO2Prod=NetO2Prod)                  
+           )
+    })
+  }  # end of model equations
+
+```
+
+# Model run
+```{r}
+NYEARS <- 1. # number of years of integration
+dt     <- 1. # time step
+times  <- seq(from = 0, to = NYEARS*365, by = dt)
+
+```
+
+## Solving the model
+```{r}
+  P    <- ode   (y        = States,
+                 times    = times,
+                 func     = NPZDO2,
+                 parms    = Parms )
+```
+
+## Plotting output variables and state variables
+
+# This chunk is to prepare the data to use ggplot2. Using ggplot 2 requres the data to be in the form of a data frame.
+```{r}
+
+library(tidyr)
+# Converting the model data (P) into a data frame
+P_df <- as.data.frame(P)
+# Adding the time column to data
+P_df$time <- times  
+# Reshaping the data into a "long" format for ggplot2
+P_long <- pivot_longer(
+    P_df,
+    cols = -time,  # this is to use all columns except 'time'
+    names_to = "Variable",  # Name the column for parameters
+    values_to = "Value"     # Name the column for values
+)
+```
+# This chunk is to plot with ggplot2:
+```{r, fig.width = 10, fig.height=9}
+par(mfrow=c(4,3))
+
+ggplot(P_long, aes(x = time, y = Value)) +
+    geom_line(aes(color = Variable)) +
+    facet_wrap(~Variable, scales = "free_y", ncol = 5) +  
+    scale_color_manual(values = rainbow(length(unique(P_long$Variable)))) +  
+    ggtitle("Model Parameters v/s Time") +  
+    xlab("Time (days)") +  
+    ylab("Value") +  
+    theme(
+        strip.text = element_text(size = 10),  
+        axis.text.x = element_text(angle = 90, hjust = 1),  
+        panel.grid.major = element_line(color = "gray90"),  
+        panel.background = element_rect(fill = "white"),  
+        legend.position = "none" 
+    )
+```
+#####################################
+# TASK 8: Case of EUTROPHICATION with DEPTH=100m (with RiVER INPUT and Temptrend=0)
+#####################################
+```{r}
+
+Parms <- c(
+  depth         = 100,        # [m ] depth of the bay
+  arrheniusCt   = 1.07,     #   -  Temperature Dependency of Process rates 
+ 
+  #Physical parameters                                                
+  salinity                    = 34,     #           - 
+  TempTrend                 =0., #Temperature estimated trend
+ 
+ #Phytoplankton
+  maxUptake      = 1., # [/day] Maximum uptake rate 
+  ksPAR          = 55., # [W/m2] half-saturation coefficient for light
+  ksDIN          = 1.0, # [mmolN/m3] half-saturation coefficient for nutrient
+  kd             = 0.1,     # /m   Light extinction coefficient
+  ChlNratio     = 1, # mgChla/mmolN
+  RespFrac       = 0.3, #Fraction of the uptake that is respired
+  mortalityRatePHYTO =0.05, #Natural lysis of phytoplankton 
+  
+ #Zooplankton
+  maxGrazing    = 1.0,  # [/day] Maximum Grazing rate
+  ksGrazing     = 1.0, # [mmolN/m3] half-saturation coefficient for nutrient
+  pFaeces       = 0.3,  # [-]
+  excretionRate = 0.1, # [/day]
+  mortalityRateZOO = 0.4, # [/(mmolN/m3)/day]
+  
+  #Remineralisation 
+  mineralisationRate = 0.1, # [/day]
+  ONratio =0.16, #molO2/molN, Oxygen to nitrogen ratio of organic matter
+  
+  #Mimic eutrophication by adding a flux of detritus and DIN
+  DilRate=0.05, #Dilution rate /day
+  DET_River=10., #Concentration of detritus in the rivers in mmolN/m3
+  DIN_River=10. #Concentration of DIN in the rivers in mmolN/m3
+)
+
+```
+## State variables
+
+State variables are explicitly described in the model by differential equations. They need to be given a name and an initial value. All concentrations are expressed in mol C/m2.
+```{r}
+States <- c(DIN       = 2.5,   # mmolN/m3  initial concentration of dissolved inorganic nitrogen  
+            PHYTO     = 0.05,   # mmolN/m3 initial phytoplankton biomass  
+            ZOO       = 0.03,   # mmolNm3   initial zooplankton biomass 
+            DET       = 0.5,    # mmolN/m3  initial detritus concentration
+            DOX       = 240)  # mmolO2/m3   initial oxygen concentration
+            
+```
+
+## forcing functions
+```{r}
+data.temperature <- read.table(file = "Forcings/Temperature_DailyAveraged.txt", skip=1, header=TRUE)  
+data.light <- read.table(file = "Forcings/SolarRadiation_DailyAveraged.txt", 
+                                 skip=1, header=TRUE)  
+data.wind  <- read.table(file = "Forcings/Wind_MeteoStation.txt", skip=1, header=TRUE) 
+
+ftemperature     <- approxfun(x = data.temperature[,2], y = data.temperature[,3], rule = 2)
+flight           <- approxfun(x = data.light[,2], y = data.light[,3], rule = 2)
+fwind            <- approxfun(x = data.wind[,2], y = data.wind[,3], rule = 2)
+
+Day<-trunc(data.wind[,2])
+Wind<-tapply(data.wind[,3],INDEX=Day,FUN=mean)
+fwind<-approxfun(x=0:365,y=Wind,rule=2)
+
+```
+
+## observations
+```{r}
+data.oxygen   <- read.table(file = "Data/Oxygen_DailyAveraged.txt", skip=1, header=TRUE)  
+
+```
+
+## The model function
+```{r }
+NPZDO2 <- function(t, y, parms)
+ {
+ with(as.list(c(y, parms)),{
+
+# Initialisation            
+
+# set forcing functions  
+  Light       <- flight(t)           # determines photosynthesis
+  Wind        <- fwind(t)            # modulates the air-sea exchange
+  Temperature <- ftemperature(t) +TempTrend     # affects biological rates and air-sea exchange 
+  Salinity<-salinity
+
+# Photosynthesis depends on the light, light decreases with water depth, not all light is PAR
+ 
+  PAR <- 0.5*Light *exp(-kd*(depth)) # 50% of light in par,   
+
+#  All rates are expressed at 18 dg - Tempfac = the factor of increase with temperature
+  Tempfac <- arrheniusCt ^ (Temperature-18.)
+  
+# The biological rates  
+
+
+# Rate expressions - all in units of [mmolN/m3/day]
+    DINuptake <- Tempfac*maxUptake * PAR/(PAR+ksPAR) * DIN/(DIN+ksDIN)*PHYTO
+    Grazing   <- Tempfac*maxGrazing* PHYTO/(PHYTO+ksGrazing)*ZOO
+    Faeces    <- pFaeces * Grazing
+    ZooGrowth <- (1-pFaeces) * Grazing
+    Excretion <- Tempfac*excretionRate * ZOO
+    MortalityZOO <- Tempfac*mortalityRateZOO * ZOO * ZOO
+    MortalityPHYTO <- Tempfac*mortalityRatePHYTO * PHYTO
+    Mineralisation <- Tempfac*mineralisationRate * DET
+    
+# Oxygen dynamics   
+# Rate expressions - all in units of [mmolO2/m3/day]
+    Respiration <- (Mineralisation+Excretion+DINuptake*RespFrac)*ONratio
+    GrossPhotosynthesis <- DINuptake*ONratio
+#Net Oxygen production
+    NetO2Prod <-GrossPhotosynthesis-Respiration
+    
+# Atmospheric air-sea exchange   
+Piston         <- gas_transfer(t = Temperature, u10 = Wind, species = "O2")*86400  # m/d
+
+#Compute the saturation constant of oxygen
+Satox          <- gas_O2sat(S = Salinity, t = Temperature) / molweight("O2") #in mol/m3
+   
+#convert from mol/m3 in mmol/m3
+Satox<-Satox*1000  
+
+#if the water is undersaturated (i.e. Satox>DOX) (resp. over, ie. Satox<DOX) then the AirSeaExchange will be positive (resp. negative), water will gain (resp. loose) oxygen.    
+ 
+AirSeaExchange <- Piston*(Satox - DOX)   # mmol O2 / m2 / d, 
+
+#Percentage of Saturation
+DOXSat<-DOX/Satox*100
+
+# Sign of saturation
+OxDIFF<-Satox - DOX
+
+#Mimic Eutrophication: add river inputs of DIN and DET
+RiverDIN<-DilRate*DIN_River
+RiverDET<-DilRate*DET_River
+
+
+# The rate of change of state variables !
+
+# Mass balances [mmolN/m3/day]
+
+## CASE: Wihtout lateral transport
+
+   #dDIN      <- Mineralisation + Excretion - DINuptake 
+   #dPHYTO    <- DINuptake - Grazing -MortalityPHYTO
+   #dZOO      <- ZooGrowth - Excretion - MortalityZOO
+   #dDET      <- MortalityZOO +MortalityPHYTO - Mineralisation + Faeces  
+   
+## CASE: EUTROPHICATION With lateral transport and rivers
+   
+  dDIN      <- Mineralisation + Excretion - DINuptake +RiverDIN -DilRate*DIN
+  dPHYTO    <- DINuptake - Grazing -MortalityPHYTO - DilRate*PHYTO
+  dZOO      <- ZooGrowth - Excretion - MortalityZOO-DilRate*ZOO
+  dDET      <- MortalityZOO +MortalityPHYTO- Mineralisation + Faeces +RiverDET -DilRate*DET
+
+## Oxygen balances [mmolO2/m3/day]
+
+#CASE: SURFACE
+dDOX  <-NetO2Prod + AirSeaExchange/depth   
+
+#CASE: UNDERWATER
+#dDOX  <-NetO2Prod
+
+# Total nitrogen in the system in mmolN/m3
+TotalN <- DIN+PHYTO+ZOO+DET 
+    
+#Chlorophyll in mgChla/m3    
+Chlorophyll<-PHYTO*ChlNratio  
+    
+# # The model function must first return the rates of the state variables 
+# (in the order in which they are defined) -  then the ordinary variables are returned
+    return (list(c(dDIN, dPHYTO, dZOO, dDET,dDOX),   # the rates of change
+                   TotalN = TotalN, Chlorophyll=Chlorophyll, # ordinary output variables
+                   AirSeaExchange = AirSeaExchange, 
+                   Satox=Satox, 
+                 OxDIFF=OxDIFF,
+                 DOXSat=DOXSat,
+                   Temperature = Temperature,
+                   Wind = Wind,
+                   PAR = PAR,
+                   DINuptake=DINuptake,
+                   Grazing=Grazing,
+                   Excretion=Excretion,
+                   ZooGrowth=ZooGrowth,
+                   MortalityPHYTO=MortalityPHYTO,
+                 MortalityZOO=MortalityZOO,
+                   Mineralisation=Mineralisation,
+                   Faeces=Faeces,
+                 GrossPhotosynthesis=GrossPhotosynthesis,
+                 Respiration=Respiration,
+                 NetO2Prod=NetO2Prod)                  
+           )
+    })
+  }  # end of model equations
+
+```
+
+# Model run
+```{r}
+NYEARS <- 1. # number of years of integration
+dt     <- 1. # time step
+times  <- seq(from = 0, to = NYEARS*365, by = dt)
+
+```
+
+## Solving the model
+```{r}
+  P    <- ode   (y        = States,
+                 times    = times,
+                 func     = NPZDO2,
+                 parms    = Parms )
+```
+
+## Plotting output variables and state variables
+
+# This chunk is to prepare the data to use ggplot2. Using ggplot 2 requres the data to be in the form of a data frame.
+```{r}
+
+library(tidyr)
+# Converting the model data (P) into a data frame
+P_df <- as.data.frame(P)
+# Adding the time column to data
+P_df$time <- times  
+# Reshaping the data into a "long" format for ggplot2
+P_long <- pivot_longer(
+    P_df,
+    cols = -time,  # this is to use all columns except 'time'
+    names_to = "Variable",  # Name the column for parameters
+    values_to = "Value"     # Name the column for values
+)
+```
+# This chunk is to plot with ggplot2:
+```{r, fig.width = 10, fig.height=9}
+par(mfrow=c(4,3))
+
+ggplot(P_long, aes(x = time, y = Value)) +
+    geom_line(aes(color = Variable)) +
+    facet_wrap(~Variable, scales = "free_y", ncol = 5) +  
+    scale_color_manual(values = rainbow(length(unique(P_long$Variable)))) +  
+    ggtitle("Model Parameters v/s Time") +  
+    xlab("Time (days)") +  
+    ylab("Value") +  
+    theme(
+        strip.text = element_text(size = 10),  
+        axis.text.x = element_text(angle = 90, hjust = 1),  
+        panel.grid.major = element_line(color = "gray90"),  
+        panel.background = element_rect(fill = "white"),  
+        legend.position = "none" 
+    )
+```
+#####################################
+### TASK 9: Sensitivity Analysis ###
+#####################################
+
+```{r}
+
+Parms <- c(
+  depth         = 5,        # [m ] depth of the bay
+  arrheniusCt   = 1.07,     #   -  Temperature Dependency of Process rates 
+ 
+  #Physical parameters                                                
+  salinity                    = 34,     #           - 
+  TempTrend                 =0., #Temperature estimated trend
+ 
+ #Phytoplankton
+  maxUptake      = 1., # [/day] Maximum uptake rate 
+  ksPAR          = 55., # [W/m2] half-saturation coefficient for light
+  ksDIN          = 1.0, # [mmolN/m3] half-saturation coefficient for nutrient
+  kd             = 0.1,     # /m   Light extinction coefficient
+  ChlNratio     = 1, # mgChla/mmolN
+  RespFrac       = 0.3, #Fraction of the uptake that is respired
+  mortalityRatePHYTO =0.05, #Natural lysis of phytoplankton 
+  
+ #Zooplankton
+  maxGrazing    = 1.0,  # [/day] Maximum Grazing rate
+  ksGrazing     = 1.0, # [mmolN/m3] half-saturation coefficient for nutrient
+  pFaeces       = 0.3,  # [-]
+  excretionRate = 0.1, # [/day]
+  mortalityRateZOO = 0.4, # [/(mmolN/m3)/day]
+  
+  #Remineralisation 
+  mineralisationRate = 0.1, # [/day]
+  ONratio =0.16, #molO2/molN, Oxygen to nitrogen ratio of organic matter
+  
+  #Mimic eutrophication by adding a flux of detritus and DIN
+  DilRate=0.05, #Dilution rate /day
+  DET_River=10., #Concentration of detritus in the rivers in mmolN/m3
+  DIN_River=10. #Concentration of DIN in the rivers in mmolN/m3
+)
+
+```
+## State variables
+
+State variables are explicitly described in the model by differential equations. They need to be given a name and an initial value. All concentrations are expressed in mol C/m2.
+```{r}
+States <- c(DIN       = 2.5,   # mmolN/m3  initial concentration of dissolved inorganic nitrogen  
+            PHYTO     = 0.05,   # mmolN/m3 initial phytoplankton biomass  
+            ZOO       = 0.03,   # mmolNm3   initial zooplankton biomass 
+            DET       = 0.5,    # mmolN/m3  initial detritus concentration
+            DOX       = 240)  # mmolO2/m3   initial oxygen concentration
+            
+```
+
+## forcing functions
+```{r}
+data.temperature <- read.table(file = "Forcings/Temperature_DailyAveraged.txt", skip=1, header=TRUE)  
+data.light <- read.table(file = "Forcings/SolarRadiation_DailyAveraged.txt", 
+                                 skip=1, header=TRUE)  
+data.wind  <- read.table(file = "Forcings/Wind_MeteoStation.txt", skip=1, header=TRUE) 
+
+ftemperature     <- approxfun(x = data.temperature[,2], y = data.temperature[,3], rule = 2)
+flight           <- approxfun(x = data.light[,2], y = data.light[,3], rule = 2)
+fwind            <- approxfun(x = data.wind[,2], y = data.wind[,3], rule = 2)
+
+Day<-trunc(data.wind[,2])
+Wind<-tapply(data.wind[,3],INDEX=Day,FUN=mean)
+fwind<-approxfun(x=0:365,y=Wind,rule=2)
+
+```
+
+## observations
+```{r}
+data.oxygen   <- read.table(file = "Data/Oxygen_DailyAveraged.txt", skip=1, header=TRUE)  
+
+```
+
+## The model function
+```{r }
+NPZDO2 <- function(t, y, parms)
+ {
+ with(as.list(c(y, parms)),{
+
+# Initialisation            
+
+# set forcing functions  
+  Light       <- flight(t)           # determines photosynthesis
+  Wind        <- fwind(t)            # modulates the air-sea exchange
+  Temperature <- ftemperature(t) +TempTrend     # affects biological rates and air-sea exchange 
+  Salinity<-salinity
+
+# Photosynthesis depends on the light, light decreases with water depth, not all light is PAR
+ 
+  PAR <- 0.5*Light *exp(-kd*(depth)) # 50% of light in par,   
+
+#  All rates are expressed at 18 dg - Tempfac = the factor of increase with temperature
+  Tempfac <- arrheniusCt ^ (Temperature-18.)
+  
+# The biological rates  
+
+
+# Rate expressions - all in units of [mmolN/m3/day]
+    DINuptake <- Tempfac*maxUptake * PAR/(PAR+ksPAR) * DIN/(DIN+ksDIN)*PHYTO
+    Grazing   <- Tempfac*maxGrazing* PHYTO/(PHYTO+ksGrazing)*ZOO
+    Faeces    <- pFaeces * Grazing
+    ZooGrowth <- (1-pFaeces) * Grazing
+    Excretion <- Tempfac*excretionRate * ZOO
+    MortalityZOO <- Tempfac*mortalityRateZOO * ZOO * ZOO
+    MortalityPHYTO <- Tempfac*mortalityRatePHYTO * PHYTO
+    Mineralisation <- Tempfac*mineralisationRate * DET
+    
+# Oxygen dynamics   
+# Rate expressions - all in units of [mmolO2/m3/day]
+    Respiration <- (Mineralisation+Excretion+DINuptake*RespFrac)*ONratio
+    GrossPhotosynthesis <- DINuptake*ONratio
+#Net Oxygen production
+    NetO2Prod <-GrossPhotosynthesis-Respiration
+    
+# Atmospheric air-sea exchange   
+Piston         <- gas_transfer(t = Temperature, u10 = Wind, species = "O2")*86400  # m/d
+
+#Compute the saturation constant of oxygen
+Satox          <- gas_O2sat(S = Salinity, t = Temperature) / molweight("O2") #in mol/m3
+   
+#convert from mol/m3 in mmol/m3
+Satox<-Satox*1000  
+
+#if the water is undersaturated (i.e. Satox>DOX) (resp. over, ie. Satox<DOX) then the AirSeaExchange will be positive (resp. negative), water will gain (resp. loose) oxygen.    
+ 
+AirSeaExchange <- Piston*(Satox - DOX)   # mmol O2 / m2 / d, 
+
+#Percentage of Saturation
+DOXSat<-DOX/Satox*100
+
+# Sign of saturation
+OxDIFF<-Satox - DOX
+
+#Mimic Eutrophication: add river inputs of DIN and DET
+RiverDIN<-DilRate*DIN_River
+RiverDET<-DilRate*DET_River
+
+
+# The rate of change of state variables !
+
+# Mass balances [mmolN/m3/day]
+
+## CASE: Wihtout lateral transport
+
+   dDIN      <- Mineralisation + Excretion - DINuptake 
+   dPHYTO    <- DINuptake - Grazing -MortalityPHYTO
+   dZOO      <- ZooGrowth - Excretion - MortalityZOO
+   dDET      <- MortalityZOO +MortalityPHYTO - Mineralisation + Faeces  
+   
+## CASE: EUTROPHICATION With lateral transport and rivers
+   
+  #dDIN      <- Mineralisation + Excretion - DINuptake +RiverDIN -DilRate*DIN
+  #dPHYTO    <- DINuptake - Grazing -MortalityPHYTO - DilRate*PHYTO
+  #dZOO      <- ZooGrowth - Excretion - MortalityZOO-DilRate*ZOO
+  #dDET      <- MortalityZOO +MortalityPHYTO- Mineralisation + Faeces +RiverDET -DilRate*DET
+
+## Oxygen balances [mmolO2/m3/day]
+
+#CASE: SURFACE
+dDOX  <-NetO2Prod + AirSeaExchange/depth   
+
+#CASE: UNDERWATER
+#dDOX  <-NetO2Prod
+
+# Total nitrogen in the system in mmolN/m3
+TotalN <- DIN+PHYTO+ZOO+DET 
+    
+#Chlorophyll in mgChla/m3    
+Chlorophyll<-PHYTO*ChlNratio  
+    
+# # The model function must first return the rates of the state variables 
+# (in the order in which they are defined) -  then the ordinary variables are returned
+    return (list(c(dDIN, dPHYTO, dZOO, dDET,dDOX),   # the rates of change
+                   TotalN = TotalN, Chlorophyll=Chlorophyll, # ordinary output variables
+                   AirSeaExchange = AirSeaExchange, 
+                   Satox=Satox, 
+                 OxDIFF=OxDIFF,
+                 DOXSat=DOXSat,
+                   Temperature = Temperature,
+                   Wind = Wind,
+                   PAR = PAR,
+                   DINuptake=DINuptake,
+                   Grazing=Grazing,
+                   Excretion=Excretion,
+                   ZooGrowth=ZooGrowth,
+                   MortalityPHYTO=MortalityPHYTO,
+                 MortalityZOO=MortalityZOO,
+                   Mineralisation=Mineralisation,
+                   Faeces=Faeces,
+                 GrossPhotosynthesis=GrossPhotosynthesis,
+                 Respiration=Respiration,
+                 NetO2Prod=NetO2Prod)                  
+           )
+    })
+  }  # end of model equations
+
+```
+
+# Model run
+```{r}
+NYEARS <- 1. # number of years of integration
+dt     <- 1. # time step
+times  <- seq(from = 0, to = NYEARS*365, by = dt)
+
+```
+
+## Solving the model
+```{r}
+  P    <- ode   (y        = States,
+                 times    = times,
+                 func     = NPZDO2,
+                 parms    = Parms )
+```
+
+## Plotting output variables and state variables
+
+# This chunk is to prepare the data to use ggplot2. Using ggplot 2 requres the data to be in the form of a data frame.
+```{r}
+
+library(tidyr)
+# Converting the model data (P) into a data frame
+P_df <- as.data.frame(P)
+# Adding the time column to data
+P_df$time <- times  
+# Reshaping the data into a "long" format for ggplot2
+P_long <- pivot_longer(
+    P_df,
+    cols = -time,  # this is to use all columns except 'time'
+    names_to = "Variable",  # Name the column for parameters
+    values_to = "Value"     # Name the column for values
+)
+```
+# This chunk is to plot with ggplot2:
+```{r, fig.width = 10, fig.height=9}
+par(mfrow=c(4,3))
+
+ggplot(P_long, aes(x = time, y = Value)) +
+    geom_line(aes(color = Variable)) +
+    facet_wrap(~Variable, scales = "free_y", ncol = 5) +  
+    scale_color_manual(values = rainbow(length(unique(P_long$Variable)))) +  
+    ggtitle("Model Parameters v/s Time") +  
+    xlab("Time (days)") +  
+    ylab("Value") +  
+    theme(
+        strip.text = element_text(size = 10),  
+        axis.text.x = element_text(angle = 90, hjust = 1),  
+        panel.grid.major = element_line(color = "gray90"),  
+        panel.background = element_rect(fill = "white"),  
+        legend.position = "none" 
+    )
+```
+# Sensitivity analysis code
+```{r}
+## This is my code to understand the sensitivity of the two selected parameters (maxUptake and maxGrazing)
+
+# Define parameter ranges
+maxGrazing_values <- seq(0.5, 2.5, by = 0.5)  # Vary maxGrazing from 0.5 to 2.5
+maxUptake_values <- seq(0.25, 1.0, by = 0.25)   # Vary maxUptake from 1.0 to 3.0
+
+# Store results
+results_grazing <- list()
+results_uptake <- list()
+
+# Loop over maxGrazing values
+for (g in maxGrazing_values) {
+    Parms["maxGrazing"] <- g
+    P <- ode(y = States, times = times, func = NPZDO2, parms = Parms)
+    results_grazing[[paste0("maxGrazing_", g)]] <- P
+}
+
+# Loop over maxUptake values
+for (u in maxUptake_values) {
+    Parms["maxUptake"] <- u
+    P <- ode(y = States, times = times, func = NPZDO2, parms = Parms)
+    results_uptake[[paste0("maxUptake_", u)]] <- P
+}
+
+# Extract PHYTO from results
+sensitivity_data_grazing <- data.frame(
+    Time = rep(times, length(maxGrazing_values)),
+    PHYTO = unlist(lapply(results_grazing, function(res) res[, "PHYTO"])),
+    maxGrazing = rep(maxGrazing_values, each = length(times))
+)
+
+# Extract PHYTO for maxUptake variations
+sensitivity_data_uptake <- data.frame(
+    Time = rep(times, length(maxUptake_values)),  # Replicate time for all runs
+    PHYTO = unlist(lapply(results_uptake, function(res) res[, "PHYTO"])),  # Extract PHYTO values
+    maxUptake = rep(maxUptake_values, each = length(times))  # Replicate maxUptake values
+)
+
+# Plot PHYTO sensitivity to maxUptake
+ggplot(sensitivity_data_uptake, aes(x = Time, y = PHYTO, color = factor(maxUptake))) +
+    geom_line() +
+    labs(title = "Sensitivity of PHYTO to maxUptake",
+         x = "Time", y = "Phytoplankton Biomass",
+         color = "maxUptake")
+
+# Plot PHYTO sensitivity to maxGrazing
+library(ggplot2)
+ggplot(sensitivity_data_grazing, aes(x = Time, y = PHYTO, color = factor(maxGrazing))) +
+    geom_line() +
+    labs(title = "Sensitivity of PHYTO to maxGrazing",
+         x = "Time", y = "Phytoplankton Biomass",
+         color = "maxGrazing")
+```
+
+```{r}
+pselect<- c("maxUptake","ksPAR","ksDIN","kd","RespFrac","maxGrazing","ksGrazing","pFaeces","excretionRate","mortalityRateZOO","mortalityRatePHYTO","mineralisationRate","TempTrend")
+parRanges <- data.frame(min = Parms[pselect]*0.5, max = Parms[pselect]*1.5)
+rownames(parRanges) <- names(Parms[pselect])
+parRanges
+```
+## 2. Sensitivity function 
+define a function that will run the model with modified paramters, is called by the sensitivity routine and output model variables
+
+```{r}
+
+outtimes  <- seq(from = 0, to = 365, by = dt)
+SensitivityNPZDO2 <-function(Parms, outtimes) {
+  
+P    <- ode   (y= States,
+                 times    = times,
+                 func     = NPZDO2,
+                 parms    = Parms )
+        return(as.data.frame(P)) 
+}
+
+#out<-SensitivityNPZDO2(Parms)
+```
+
+
+## 3. Local Sensitivity (bonus exercise involving FME package)
+Estimate Local Sensitivity in order to rank the parameters by their influence on model results
+```{r}
+LocalSens<-sensFun(func = SensitivityNPZDO2, parms = Parms, sensvar=c("DIN","PHYTO","ZOO","DET","DOX"), senspar = pselect, varscale = NULL)
+head(LocalSens)
+plot(LocalSens)
+summary(LocalSens)
+#Compute the Sensitivity for each state variable
+summary(LocalSens,var=TRUE)
+
+```
+
+## 4. Global Sensitivity (bonus exercise involving FME package)
+
+```{r, fig.wdith=3.5, fig.height=3.5}
+Sens<-sensRange(func = SensitivityNPZDO2, parms = Parms, dist = "unif", 
+parRange =parRanges, sensvar=c("DIN","PHYTO","ZOO","DET","DOX"),num=30) 
+GlobalSens<-summary(Sens)
+plot(GlobalSens, which = c("DIN", "PHYTO", "ZOO", "DET","DOX"), xyswap = FALSE, legpos = "topright")
+head (GlobalSens)
+mtext(side = 3, line = -1, outer = TRUE, "Sensitivity  ", cex = 1.15)
+```
+
+
+
+```{r}
+# Load required libraries
+library(FME)
+library(reshape2)
+library(dplyr)
+library(ggplot2)
+
+# Step 1: Extract state variables and time from Sens object
+Sens_df <- as.data.frame(Sens)       # Convert Sens$X to a dataframe
+
+# Correctly extract time as a vector of the same length as rows in Sens$X
+Sens_time <- seq(0, nrow(Sens_df) - 1, by = 1)  # Generate time steps matching rows
+Sens_df$time <- Sens_time                      # Add 'time' column
+
+# Verify the dataframe
+head(Sens_df)
+
+# Step 2: Reshape the data into long format for ggplot2
+Sens_long <- melt(Sens_df, id.vars = "time", variable.name = "StateVariable", value.name = "Value")
+
+# Step 3: Calculate summary statistics (Mean, Min, Max) for each state variable at each time step
+Sens_summary <- Sens_long %>%
+    group_by(time, StateVariable) %>%
+    summarise(
+        Mean = mean(Value),
+        Min = min(Value),
+        Max = max(Value)
+    )
+
+# Step 4: Plot the Global Sensitivity Results using ggplot2
+ggplot(Sens_summary, aes(x = time)) +
+    geom_ribbon(aes(ymin = Min, ymax = Max, fill = StateVariable), alpha = 0.3) +  # Shaded Min-Max range
+    geom_line(aes(y = Mean, color = StateVariable), linewidth = 1) +  # Mean trend line
+    facet_wrap(~StateVariable, scales = "free_y", ncol = 3) +  # Facet for each variable
+    labs(
+        title = "Global Sensitivity Analysis",
+        x = "Time (days)",
+        y = "State Variable Value"
+    ) +
+    scale_fill_viridis_d(option = "turbo") +  # Turbo palette for shaded areas
+    scale_color_viridis_d(option = "turbo") +  # Turbo palette for lines
+    theme_minimal(base_size = 14) +  # Clean, modern theme
+    theme(
+        strip.text = element_text(size = 12, face = "bold"),  # Bold facet labels
+        plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+        axis.text = element_text(size = 10),
+        axis.title = element_text(size = 12),
+        legend.position = "none"  # Hide legend for cleaner visuals
+    )
+```
+
+```{r}
+#####################################
+### TASK 1O :  ### Heloise
+#####################################
+
+#Parameters are constants that we use in the model equations.
+
+#In the following R-code, the model parameters are combined in a vector.
+
+Parms <- c(
+  depth         = 5,        # [m ] depth of the bay
+  arrheniusCt   = 1.07,     #   -  Temperature Dependency of Process rates 
+ 
+  #Physical parameters                                                
+  salinity                    = 34,     #           - 
+  TempTrend                 =0., #Tempertaure estimated trend
+ 
+ #Phytoplankton
+  maxUptake      = 1., # [/day] Maximum uptake rate 
+  ksPAR          = 55., # [W/m2] half-saturation coefficient for light
+  ksDIN          = 1.0, # [mmolN/m3] half-saturation coefficient for nutrient
+  kd             = 0.1,     # /m   Light exinction coefficient
+  ChlNratio     = 1, # mgChla/mmolN
+  RespFrac       = 0.3, #Fraction of the uptake that is respired
+  mortalityRatePHYTO =0.05, #Natural lysis of phytoplankton 
+  
+ #Zooplankton
+  maxGrazing    = 1.0,  # [/day] Maximum Grazing rate
+  ksGrazing     = 1.0, # [mmolN/m3] half-saturation coefficient for nutrient
+  pFaeces       = 0.3,  # [-]
+  excretionRate = 0.1, # [/day]
+  mortalityRateZOO = 0.4, # [/(mmolN/m3)/day]
+  
+  #Reminaeralisation 
+  mineralisationRate = 0.1, # [/day]
+  ONratio =0.16, #molO2/molN, Oxygen to nitrogen ratio of organic matter
+  
+  #Mimic eutrophication by adding a flux of detritus and DIN
+  DilRate=0.05, #Dilution rate /day
+  DET_River=10., #Concentration of detritus in the rivers in mmolN/m3
+  DIN_River=10,  #Concentration of DIN in the rivers in mmolN/m3
+ 
+ kin=0.5,
+ Nitrif =0.03, # /day, nitrification rate
+ ONratioNitrif =2,  # 2Mol O2 needed to oxidize one mol of NHs for  nitrification, mol O2/mol NHs
+)
+
+```
+
+## State variables
+
+State variables are explicitly described in the model by differential equations. They need to be given a name and an initial value. All concentrations are expressed in mol C/m2.
+
+```{r}
+States <- c(NOS       = 1.5,   # mmolN/m3  initial concentration of nitrate
+            NHS       =1, # mmolN/m3  initial concentration of ammonium
+            PHYTO     = 0.05,   # mmolN/m3 initial phytoplankton biomass  
+            ZOO       = 0.03,   # mmolNm3   initial zooplankton biomass 
+            DET       = 0.5,    # mmolN/m3  initial detritus concentration
+            DOX       = 240    # mmolO2/m3   initial oxygen concentration
+            )  
+            
+```
+
+```{r}
+data.temperature <- read.table(file = "Forcings/Temperature_DailyAveraged.txt", skip=1, header=TRUE)  
+data.light <- read.table(file = "Forcings/SolarRadiation_DailyAveraged.txt", 
+                                 skip=1, header=TRUE)  
+data.wind  <- read.table(file = "Forcings/Wind_MeteoStation.txt", skip=1, header=TRUE) 
+
+ftemperature     <- approxfun(x = data.temperature[,2], y = data.temperature[,3], rule = 2)
+flight           <- approxfun(x = data.light[,2], y = data.light[,3], rule = 2)
+fwind            <- approxfun(x = data.wind[,2], y = data.wind[,3], rule = 2)
+
+Day<-trunc(data.wind[,2])
+Wind<-tapply(data.wind[,3],INDEX=Day,FUN=mean)
+fwind<-approxfun(x=0:365,y=Wind,rule=2)
+
+```
+
+## observations
+
+Finally, the realism of the model needs to be assessed by comparing it to observations. Observations are in subdirectory ./Data/
+
+Oxygen observations from optodes are used:
+
+-   'OxygenObs" ,units= "mol/l" - "Oxygen concentration from optode at 9m" ,file="Oxygen_DailyAveraged.txt"),
+
+The following code reads this file and creates observations data files
+
+```{r}
+data.oxygen   <- read.table(file = "Data/Oxygen_DailyAveraged.txt", skip=1, header=TRUE)  
+
+```
+## The model function
+
+In the model function (called *NPZDO2*), we define the model equations by describing the rate of change of the state variables. We also calculate some model variables, which are calculated as a function of the state variables. These variables are used for instance to compare the model to data, or to get information on the rates.
+
+This function will be entered several times as R is solving the model. Each time it enters, it will have the actual time (t), the values of the state variables at that time (y), and the parameters (parms).
+
+The first statement in this function (*with (as.list(c(arms,y))*) ensures that within the function, you can use the names of the parameters and state variables.
+
+```{r }
+NPZDO2 <- function(t, y, parms)
+ {
+ with(as.list(c(y, parms)),{
+#=============================!
+# Initialisation              !
+#=============================!
+
+# set forcing functions  
+  Light       <- flight(t)           # determines photosynthesis
+  Wind        <- fwind(t)            # modulates the air-sea exchange
+  Temperature <- ftemperature(t) +TempTrend     # affects biological rates and air-sea exchange 
+  Salinity<-salinity
+
+# Photosynthesis depends on the light, light decreases with water depth, not all light is PAR
+ 
+  PAR <- 0.5*Light *exp(-kd*(depth)) # 50% of light in par,   
+
+#  All rates are expressed at 18 dg - Tempfac = the factor of increase with temperature
+  Tempfac <- arrheniusCt ^ (Temperature-18.)
+  
+#=============================!
+# The biological rates        !
+#=============================!
+
+# Rate expressions - all in units of [mmolN/m3/day]
+
+    Grazing   <- Tempfac*maxGrazing* PHYTO/(PHYTO+ksGrazing)*ZOO
+    Faeces    <- pFaeces * Grazing
+    ZooGrowth <- (1-pFaeces) * Grazing
+    Excretion <- Tempfac*excretionRate * ZOO
+    MortalityZOO <- Tempfac*mortalityRateZOO * ZOO * ZOO
+    MortalityPHYTO <- Tempfac*mortalityRatePHYTO * PHYTO
+    Mineralisation <- Tempfac*mineralisationRate * DET
+    
+   Nitrification <- Nitrif*NHS
+ 
+  NOSuptake<-Tempfac*maxUptake * PAR/(PAR+ksPAR) * 
+(NOS/(NOS+ksDIN)*kin/(NHS+kin))*PHYTO
+   NHSuptake<-Tempfac*maxUptake * PAR/(PAR+ksPAR) * 
+(NHS/(NHS+ksDIN))*PHYTO
+  DINuptake <-NOSuptake+NHSuptake
+
+ # Oxygen dynamics   
+# Rate expressions - all in units of [mmolO2/m3/day]
+    Respiration <- (Mineralisation+Excretion+DINuptake*RespFrac)*ONratio
+    GrossPhotosynthesis <- DINuptake*ONratio
+#Net Oxygen production
+    NetO2Prod <-GrossPhotosynthesis-Respiration
+    
+# Atmospheric air-sea exchange   
+Piston         <- gas_transfer(t = Temperature, u10 = Wind, species = "O2")*86400  # m/d
+
+#Compute the saturation constant of oxygen
+Satox          <- gas_O2sat(S = Salinity, t = Temperature) / molweight("O2") #in mol/m3
+   
+#convert from mol/m3 in mmol/m3
+Satox<-Satox*1000  
+
+#if the water is undersaturated (i.e. Satox>DOX) (resp. over, ie. Satox<DOX) then the AirSeaExchange will be positive (resp. negative), water will gain (resp. loose) oxygen.    
+ 
+AirSeaExchange <- Piston*(Satox - DOX)   # mmol O2 / m2 / d, 
+
+#Percentage of Saturation
+DOXSat<-DOX/Satox*100
+
+# Sign of saturation
+OxDIFF<-Satox - DOX
+
+#Mimic Eutrophication: add river inputs of DIN and DET
+RiverDIN<-DilRate*DIN_River
+RiverDET<-DilRate*DET_River
+
+  #=======================================!
+# The rate of change of state variables !
+#=======================================!
+# Mass balances [mmolN/m3/day]
+
+## CASE: Wihtout lateral transport
+
+   dPHYTO    <- DINuptake - Grazing -MortalityPHYTO
+   dZOO      <- ZooGrowth - Excretion - MortalityZOO
+   dDET      <- MortalityZOO +MortalityPHYTO - Mineralisation+Faeces  
+   dNOS      <- Nitrification - NOSuptake
+   dNHS      <- Mineralisation + Excretion - NHSuptake -Nitrification
+   NetO2Prod <-GrossPhotosynthesis-Respiration +(NOSuptake- Nitrification)*ONratioNitrif
+   
+## CASE: EUTROPHICATION With lateral transport and rivers
+   
+#  dDIN      <- Mineralisation + Excretion - DINuptake +RiverDIN -DilRate*DIN
+#  dPHYTO    <- DINuptake - Grazing -MortalityPHYTO - DilRate*PHYTO
+#  dZOO      <- ZooGrowth - Excretion - MortalityZOO-DilRate*ZOO
+#  dDET      <- MortalityZOO +MortalityPHYTO- Mineralisation + Faeces +RiverDET -DilRate*DET
+
+## Oxygen balances [mmolO2/m3/day]
+
+#CASE: SURFACE
+dDOX  <-NetO2Prod + AirSeaExchange/depth   
+
+#CASE: UNDERWATER
+#dDOX  <-NetO2Prod
+
+# Total nitrogen in the system in mmolN/m3
+TotalN <- NOS+NHS+PHYTO+ZOO+DET 
+    
+#Chlorophyll in mgChla/m3    
+Chlorophyll<-PHYTO*ChlNratio  
+    
+# # The model function must first return the rates of the state variables 
+# (in the order in which they are defined) -  then the ordinary variables are returned
+    return (list(c( dNOS,dNHS, dPHYTO, dZOO, dDET,dDOX, dDIP),   # the rates of change
+                   TotalN = TotalN, Chlorophyll=Chlorophyll, # ordinary output variables
+                   AirSeaExchange = AirSeaExchange, 
+                   Satox=Satox, 
+                 OxDIFF=OxDIFF,
+                 DOXSat=DOXSat,
+                   Temperature = Temperature,
+                   Wind = Wind,
+                   PAR = PAR,
+                  DINuptake=DINuptake,
+                    Grazing=Grazing,
+                   Excretion=Excretion,
+                   ZooGrowth=ZooGrowth,
+                   MortalityPHYTO=MortalityPHYTO,
+                 MortalityZOO=MortalityZOO,
+                   Mineralisation=Mineralisation,
+                   Faeces=Faeces,
+                 GrossPhotosynthesis=GrossPhotosynthesis,
+                 Respiration=Respiration,
+                 NetO2Prod=NetO2Prod)                  
+           )
+    })
+  }  # end of model equations
+
+```
+
+# Model run
+
+## Time
+
+To run the model, we need to first define the time steps at which we want to resolve the model.
+
+```{r}
+NYEARS <- 1. # number of years of integration
+dt     <- 1. # time step
+times  <- seq(from = 0, to = NYEARS*365, by = dt)
+
+```
+
+## Solving the model
+
+We run the model two times for one years, but keep only the output of the second year. The initial conditions of the second year is taken to be the final condition of the first year simulation.
+
+Function *ode* from the *deSolve* package is used to solve the model. Here the time derivatives of the state variables (that make up the model) is integrated so as to obtain the concentrations. Note that, due to the complexity of the model, this takes a lot of time - be patient.
+
+```{r}
+  P    <- ode   (y        = States,
+                 times    = times,
+                 func     = NPZDO2,
+                 parms    = Parms )
+```
+
+## Plotting output variables and state variables
+
+The model solution is a matrix with values of the state variables and the output variables, at each time step. We can select *which* variables we want to be displayed and how the figures have to be arranged (*mfrow = c(4, 3)* means 4 rows and 3 columns)
+
+```{r, fig.width = 8, fig.height=10}
+plot(P, mfrow = c(4, 3), which = 1:12)
+plot(P, mfrow = c(4, 3), which = 12:(ncol(P)-1))
+
+## Comparison with Observations
+
+```
+{r, fig.width = 8, fig.height=10}
+
+plot (x = times, y=P[,6], xlab = "Days", ylab = "Oxygen, mmol O2/m3", type = "l",
+      ylim = c(200, 280), main = "Oxygen in molO2/m3")
+points(x = data.oxygen[,2], y = 1000*data.oxygen[,3])
+legend("topleft", c("model", "data"), lty = c(1, 0), pch = c(-1, 1))
+
+```{r}
+#####################################
+### TASK 11 :  ### Heloise
+#####################################
+
+#Parameters are constants that we use in the model equations.
+
+#In the following R-code, the model parameters are combined in a vector.
+
+
+Parms <- c(
+  depth         = 5,        # [m ] depth of the bay
+  arrheniusCt   = 1.07,     #   -  Temperature Dependency of Process rates 
+ 
+  #Physical parameters                                                
+  salinity                    = 34,     #           - 
+  TempTrend                 =0., #Tempertaure estimated trend
+ 
+ #Phytoplankton
+  maxUptake      = 1., # [/day] Maximum uptake rate 
+  ksPAR          = 55., # [W/m2] half-saturation coefficient for light
+  ksDIN          = 1.0, # [mmolN/m3] half-saturation coefficient for nutrient
+  kd             = 0.1,     # /m   Light exinction coefficient
+  ChlNratio     = 1, # mgChla/mmolN
+  RespFrac       = 0.3, #Fraction of the uptake that is respired
+  mortalityRatePHYTO =0.05, #Natural lysis of phytoplankton 
+  
+ #Zooplankton
+  maxGrazing    = 1.0,  # [/day] Maximum Grazing rate
+  ksGrazing     = 1.0, # [mmolN/m3] half-saturation coefficient for nutrient
+  pFaeces       = 0.3,  # [-]
+  excretionRate = 0.1, # [/day]
+  mortalityRateZOO = 0.4, # [/(mmolN/m3)/day]
+  
+  #Reminaeralisation 
+  mineralisationRate = 0.1, # [/day]
+  ONratio =0.16, #molO2/molN, Oxygen to nitrogen ratio of organic matter
+  
+  #Mimic eutrophication by adding a flux of detritus and DIN
+  DilRate=0.05, #Dilution rate /day
+  DET_River=10., #Concentration of detritus in the rivers in mmolN/m3
+  DIN_River=10,  #Concentration of DIN in the rivers in mmolN/m3
+ 
+ kin=0.5,
+ Nitrif =0.03, # /day, nitrification rate
+ ONratioNitrif =2,  # 2Mol O2 needed to oxidize one mol of NHs for  nitrification, mol O2/mol NHs
+ ksDIP= 0.8, #[mmolP/m3] half-saturation coefficient for phosphorus uptake
+ NPratio=16, # Redfield nitrogen to phosphorus ratio
+ DIP_River=1. #Concentration of DIP in the rivers in mmolP/m3
+)
+
+```
+
+## State variables
+
+State variables are explicitly described in the model by differential equations. They need to be given a name and an initial value. All concentrations are expressed in mol C/m2.
+
+```{r}
+States <- c(NOS       = 1.5,   # mmolN/m3  initial concentration of nitrate
+            NHS       =1, # mmolN/m3  initial concentration of ammonium
+            PHYTO     = 0.05,   # mmolN/m3 initial phytoplankton biomass  
+            ZOO       = 0.03,   # mmolNm3   initial zooplankton biomass 
+            DET       = 0.5,    # mmolN/m3  initial detritus concentration
+            DOX       = 240,    # mmolO2/m3   initial oxygen concentration
+            DIP       = 0.1)  
+            
+```
+## forcing functions
+
+Forcing functions are model components that influcence the dynamics of the system but that are not explicitly described in the model. Yet, they are important enough to be included in the model. They are imposed by observed data, which are in subdirectory ./Forcings/
+
+The following forcings are used:
+
+-   fTemperature , units= dgC - air temperature file=Temperature_DailyAveraged.txt
+-   fLight , units= Wm-2 - Photosynthetically Activve Radiation file=SolarRadiation_DailyAveraged.txt
+-   fWind , units= ms-1 - wind speed file=Wind_MeteoStation.txt
+
+Here, temperature affects many process rates, the light is required for photosynthesis, and the wind determines the exchange of oxygen.
+
+The following code reads those files and creates forcing functions that interpolate these data. When called with the appropriate time, these functions will return the forcing function value for that time point. The argument *rule = 2* ensures that extrapolation occurs beyond the data.
+
+```{r}
+data.temperature <- read.table(file = "Forcings/Temperature_DailyAveraged.txt", skip=1, header=TRUE)  
+data.light <- read.table(file = "Forcings/SolarRadiation_DailyAveraged.txt", 
+                                 skip=1, header=TRUE)  
+data.wind  <- read.table(file = "Forcings/Wind_MeteoStation.txt", skip=1, header=TRUE) 
+
+ftemperature     <- approxfun(x = data.temperature[,2], y = data.temperature[,3], rule = 2)
+flight           <- approxfun(x = data.light[,2], y = data.light[,3], rule = 2)
+fwind            <- approxfun(x = data.wind[,2], y = data.wind[,3], rule = 2)
+
+Day<-trunc(data.wind[,2])
+Wind<-tapply(data.wind[,3],INDEX=Day,FUN=mean)
+fwind<-approxfun(x=0:365,y=Wind,rule=2)
+
+```
+
+## observations
+
+Finally, the realism of the model needs to be assessed by comparing it to observations. Observations are in subdirectory ./Data/
+
+Oxygen observations from optodes are used:
+
+-   'OxygenObs" ,units= "mol/l" - "Oxygen concentration from optode at 9m" ,file="Oxygen_DailyAveraged.txt"),
+
+The following code reads this file and creates observations data files
+
+```{r}
+data.oxygen   <- read.table(file = "Data/Oxygen_DailyAveraged.txt", skip=1, header=TRUE)  
+
+```
+## The model function
+
+In the model function (called *NPZDO2*), we define the model equations by describing the rate of change of the state variables. We also calculate some model variables, which are calculated as a function of the state variables. These variables are used for instance to compare the model to data, or to get information on the rates.
+
+This function will be entered several times as R is solving the model. Each time it enters, it will have the actual time (t), the values of the state variables at that time (y), and the parameters (parms).
+
+The first statement in this function (*with (as.list(c(arms,y))*) ensures that within the function, you can use the names of the parameters and state variables.
+
+```{r }
+NPZDO2 <- function(t, y, parms)
+ {
+ with(as.list(c(y, parms)),{
+#=============================!
+# Initialisation              !
+#=============================!
+
+# set forcing functions  
+  Light       <- flight(t)           # determines photosynthesis
+  Wind        <- fwind(t)            # modulates the air-sea exchange
+  Temperature <- ftemperature(t) +TempTrend     # affects biological rates and air-sea exchange 
+  Salinity<-salinity
+
+# Photosynthesis depends on the light, light decreases with water depth, not all light is PAR
+ 
+  PAR <- 0.5*Light *exp(-kd*(depth)) # 50% of light in par,   
+
+#  All rates are expressed at 18 dg - Tempfac = the factor of increase with temperature
+  Tempfac <- arrheniusCt ^ (Temperature-18.)
+  
+#=============================!
+# The biological rates        !
+#=============================!
+
+# Rate expressions - all in units of [mmolN/m3/day]
+
+    Grazing   <- Tempfac*maxGrazing* PHYTO/(PHYTO+ksGrazing)*ZOO
+    Faeces    <- pFaeces * Grazing
+    ZooGrowth <- (1-pFaeces) * Grazing
+    Excretion <- Tempfac*excretionRate * ZOO
+    MortalityZOO <- Tempfac*mortalityRateZOO * ZOO * ZOO
+    MortalityPHYTO <- Tempfac*mortalityRatePHYTO * PHYTO
+    Mineralisation <- Tempfac*mineralisationRate * DET
+    
+   Nitrification <- Nitrif*NHS
+ 
+  NOSuptake<-Tempfac*maxUptake * PAR/(PAR+ksPAR) * 
+(NOS/(NOS+ksDIN)*kin/(NHS+kin))*DIP/(DIP+ksDIP)*PHYTO
+   NHSuptake<-Tempfac*maxUptake * PAR/(PAR+ksPAR) * 
+(NHS/(NHS+ksDIN))* DIP/(DIP+ksDIP)*PHYTO
+  DINuptake <-NOSuptake+NHSuptake
+
+ # Oxygen dynamics   
+# Rate expressions - all in units of [mmolO2/m3/day]
+    Respiration <- (Mineralisation+Excretion+DINuptake*RespFrac)*ONratio
+    GrossPhotosynthesis <- DINuptake*ONratio
+#Net Oxygen production
+    NetO2Prod <-GrossPhotosynthesis-Respiration
+    
+# Atmospheric air-sea exchange   
+Piston         <- gas_transfer(t = Temperature, u10 = Wind, species = "O2")*86400  # m/d
+
+#Compute the saturation constant of oxygen
+Satox          <- gas_O2sat(S = Salinity, t = Temperature) / molweight("O2") #in mol/m3
+   
+#convert from mol/m3 in mmol/m3
+Satox<-Satox*1000  
+
+#if the water is undersaturated (i.e. Satox>DOX) (resp. over, ie. Satox<DOX) then the AirSeaExchange will be positive (resp. negative), water will gain (resp. loose) oxygen.    
+ 
+AirSeaExchange <- Piston*(Satox - DOX)   # mmol O2 / m2 / d, 
+
+#Percentage of Saturation
+DOXSat<-DOX/Satox*100
+
+# Sign of saturation
+OxDIFF<-Satox - DOX
+
+#Mimic Eutrophication: add river inputs of DIN and DET
+RiverDIN<-DilRate*DIN_River
+RiverDET<-DilRate*DET_River
+
+  #=======================================!
+# The rate of change of state variables !
+#=======================================!
+# Mass balances [mmolN/m3/day]
+
+## CASE: Wihtout lateral transport
+
+   dPHYTO    <- DINuptake - Grazing -MortalityPHYTO
+   dZOO      <- ZooGrowth - Excretion - MortalityZOO
+   dDET      <- MortalityZOO +MortalityPHYTO - Mineralisation+Faeces  
+   dNOS      <- Nitrification - NOSuptake
+   dNHS      <- Mineralisation + Excretion - NHSuptake -Nitrification
+   NetO2Prod <-GrossPhotosynthesis-Respiration +(NOSuptake- Nitrification)*ONratioNitrif
+   DIPuptake<-DINuptake/NPratio
+  dDIP      <- (Mineralisation +Excretion)/NPratio-DIPuptake
+   
+## CASE: EUTROPHICATION With lateral transport and rivers
+   
+#  dDIN      <- Mineralisation + Excretion - DINuptake +RiverDIN -DilRate*DIN
+#  dPHYTO    <- DINuptake - Grazing -MortalityPHYTO - DilRate*PHYTO
+#  dZOO      <- ZooGrowth - Excretion - MortalityZOO-DilRate*ZOO
+#  dDET      <- MortalityZOO +MortalityPHYTO- Mineralisation + Faeces +RiverDET -DilRate*DET
+
+## Oxygen balances [mmolO2/m3/day]
+
+#CASE: SURFACE
+dDOX  <-NetO2Prod + AirSeaExchange/depth   
+
+#CASE: UNDERWATER
+#dDOX  <-NetO2Prod
+
+# Total nitrogen in the system in mmolN/m3
+TotalN <- NOS+NHS+PHYTO+ZOO+DET 
+    
+#Chlorophyll in mgChla/m3    
+Chlorophyll<-PHYTO*ChlNratio  
+    
+# # The model function must first return the rates of the state variables 
+# (in the order in which they are defined) -  then the ordinary variables are returned
+    return (list(c( dNOS,dNHS, dPHYTO, dZOO, dDET,dDOX, dDIP),   # the rates of change
+                   TotalN = TotalN, Chlorophyll=Chlorophyll, # ordinary output variables
+                   AirSeaExchange = AirSeaExchange, 
+                   Satox=Satox, 
+                 OxDIFF=OxDIFF,
+                 DOXSat=DOXSat,
+                   Temperature = Temperature,
+                   Wind = Wind,
+                   PAR = PAR,
+                  DINuptake=DINuptake,
+                    Grazing=Grazing,
+                   Excretion=Excretion,
+                   ZooGrowth=ZooGrowth,
+                   MortalityPHYTO=MortalityPHYTO,
+                 MortalityZOO=MortalityZOO,
+                   Mineralisation=Mineralisation,
+                   Faeces=Faeces,
+                 GrossPhotosynthesis=GrossPhotosynthesis,
+                 Respiration=Respiration,
+                 NetO2Prod=NetO2Prod)                  
+           )
+    })
+  }  # end of model equations
+
+```
+
+# Model run
+
+## Time
+
+To run the model, we need to first define the time steps at which we want to resolve the model.
+
+```{r}
+NYEARS <- 1. # number of years of integration
+dt     <- 1. # time step
+times  <- seq(from = 0, to = NYEARS*365, by = dt)
+
+```
+
+## Solving the model
+
+We run the model two times for one years, but keep only the output of the second year. The initial conditions of the second year is taken to be the final condition of the first year simulation.
+
+Function *ode* from the *deSolve* package is used to solve the model. Here the time derivatives of the state variables (that make up the model) is integrated so as to obtain the concentrations. Note that, due to the complexity of the model, this takes a lot of time - be patient.
+
+```{r}
+  P    <- ode   (y        = States,
+                 times    = times,
+                 func     = NPZDO2,
+                 parms    = Parms )
+```
+
+## Plotting output variables and state variables
+
+The model solution is a matrix with values of the state variables and the output variables, at each time step. We can select *which* variables we want to be displayed and how the figures have to be arranged (*mfrow = c(4, 3)* means 4 rows and 3 columns)
+
+```{r, fig.width = 8, fig.height=10}
+plot(P, mfrow = c(4, 3), which = 1:12)
+plot(P, mfrow = c(4, 3), which = 12:(ncol(P)-1))
+
+## Comparison with Observations
+
+```
+{r, fig.width = 8, fig.height=10}
+
+plot (x = times, y=P[,6], xlab = "Days", ylab = "Oxygen, mmol O2/m3", type = "l",
+      ylim = c(200, 280), main = "Oxygen in molO2/m3")
+points(x = data.oxygen[,2], y = 1000*data.oxygen[,3])
+legend("topleft", c("model", "data"), lty = c(1, 0), pch = c(-1, 1))
+
+```{r}
+
+
+#####################################
+### TASK 12:  ### Stephanie 
+#####################################
+# Sprawdź obecny katalog roboczy
+getwd()
+
+# Ustaw katalog roboczy
+setwd("C:/Users/kamil_laptop/Desktop/NPZDO2")
+
+# Load required packages
+require(deSolve)
+require(marelac)
+require(diagram)
+require(FME)
+require(ggplot2)
+require(tidyr)
+
+# Model Parameters
+Parms <- c(
+  depth = 5,        # [m] depth of the bay
+  arrheniusCt = 1.07,     # Temperature Dependency of Process rates 
+  
+  # Physical parameters                                                
+  salinity = 34,     # -
+  TempTrend = 0.,    # Temperature estimated trend
+  
+  # Phytoplankton
+  maxUptake = 1.,    # [/day] Maximum uptake rate 
+  ksPAR = 55.,       # [W/m2] half-saturation coefficient for light
+  ksDIN = 1.0,       # [mmolN/m3] half-saturation coefficient for nutrient
+  kd = 0.1,          # /m Light extinction coefficient
+  ChlNratio = 1,     # mgChla/mmolN
+  RespFrac = 0.3,    # Fraction of the uptake that is respired
+  mortalityRatePHYTO = 0.05, # Natural lysis of phytoplankton 
+  
+  # Zooplankton
+  maxGrazing = 1.0,  # [/day] Maximum Grazing rate
+  ksGrazing = 1.0,   # [mmolN/m3] half-saturation coefficient for nutrient
+  pFaeces = 0.3,     # [-]
+  excretionRate = 0.1, # [/day]
+  mortalityRateZOO = 0.4, # [/(mmolN/m3)/day]
+  
+  # Remineralization 
+  mineralisationRate = 0.1, # [/day]
+  ONratio = 0.16,    # molO2/molN, Oxygen to nitrogen ratio of organic matter
+  
+  # Bottom sediments parameters
+  sinkingrate = 0.5  # [m/day] sinking rate
+)
+
+# State Variables
+States <- c(
+  DIN = 2.5,     # mmolN/m3 initial concentration of dissolved inorganic nitrogen  
+  PHYTO = 0.05,  # mmolN/m3 initial phytoplankton biomass  
+  ZOO = 0.03,    # mmolN/m3 initial zooplankton biomass 
+  DET = 0.5,     # mmolN/m3 initial detritus concentration
+  DOX = 240,     # mmolO2/m3 initial oxygen concentration
+  BOT_DET = 1    # mmolN/m2 initial bottom detritus biomass
+)
+
+# Read forcing data
+data.temperature <- read.table(file = "C:/Users/kamil_laptop/Desktop/NPZDO2/Forcings/Temperature_DailyAveraged.txt", skip=1, header=TRUE)  
+data.light <- read.table(file = "C:/Users/kamil_laptop/Desktop/NPZDO2/Forcings/SolarRadiation_DailyAveraged.txt", skip=1, header=TRUE)  
+data.wind <- read.table(file = "C:/Users/kamil_laptop/Desktop/NPZDO2/Forcings/Wind_MeteoStation.txt", skip=1, header=TRUE) 
+
+# Create forcing functions
+ftemperature <- approxfun(x = data.temperature[,2], y = data.temperature[,3], rule = 2)
+flight <- approxfun(x = data.light[,2], y = data.light[,3], rule = 2)
+Day <- trunc(data.wind[,2])
+Wind <- tapply(data.wind[,3], INDEX=Day, FUN=mean)
+fwind <- approxfun(x=0:365, y=Wind, rule=2)
+
+# Read observation data
+data.oxygen <- read.table(file = "C:/Users/kamil_laptop/Desktop/NPZDO2/Data/Oxygen_DailyAveraged.txt", skip=1, header=TRUE)
+
+# Model function
+NPZDO2 <- function(t, y, parms) {
+  with(as.list(c(y, parms)), {
+    
+    # Initialization
+    Light <- flight(t)
+    Wind <- fwind(t)
+    Temperature <- ftemperature(t) + TempTrend
+    Salinity <- salinity
+    
+    # Light calculations
+    PAR <- 0.5 * Light * exp(-kd*(depth))
+    
+    # Temperature effect
+    Tempfac <- arrheniusCt ^ (Temperature-18.)
+    
+    # Biological rates
+    DINuptake <- Tempfac * maxUptake * PAR/(PAR+ksPAR) * DIN/(DIN+ksDIN) * PHYTO
+    Grazing <- Tempfac * maxGrazing * PHYTO/(PHYTO+ksGrazing) * ZOO
+    Faeces <- pFaeces * Grazing
+    ZooGrowth <- (1-pFaeces) * Grazing
+    Excretion <- Tempfac * excretionRate * ZOO
+    MortalityZOO <- Tempfac * mortalityRateZOO * ZOO * ZOO
+    MortalityPHYTO <- Tempfac * mortalityRatePHYTO * PHYTO
+    Mineralisation <- Tempfac * mineralisationRate * DET
+    
+    # Bottom sediment processes
+    SinkDet <- sinkingrate * DET    # mmolN/m2/d
+    SinkPhy <- sinkingrate * PHYTO   # mmolN/m2/d
+    BotMin <- mineralisationRate * BOT_DET  # mmolN/m2/d
+    
+    # Oxygen dynamics
+    Respiration <- (Mineralisation + Excretion + DINuptake * RespFrac) * ONratio
+    GrossPhotosynthesis <- DINuptake * ONratio
+    NetO2Prod <- GrossPhotosynthesis - Respiration
+    
+    # Air-sea exchange
+    Piston <- gas_transfer(t = Temperature, u10 = Wind, species = "O2") * 86400
+    Satox <- gas_O2sat(S = Salinity, t = Temperature) / molweight("O2") * 1000
+    AirSeaExchange <- Piston * (Satox - DOX)
+    DOXSat <- DOX/Satox * 100
+    OxDIFF <- Satox - DOX
+    
+    # Mass balances
+    dDIN <- Mineralisation + Excretion - DINuptake + (BotMin/depth)
+    dPHYTO <- DINuptake - Grazing - MortalityPHYTO - (SinkPhy/depth)
+    dZOO <- ZooGrowth - Excretion - MortalityZOO
+    dDET <- MortalityZOO + MortalityPHYTO - Mineralisation + Faeces - (SinkDet/depth)
+    dDOX <- NetO2Prod + AirSeaExchange/depth
+    dBOT_DET <- SinkDet + SinkPhy - BotMin
+    
+    # Total nitrogen and chlorophyll
+    TotalN <- DIN + PHYTO + ZOO + DET + (BOT_DET/depth)
+    Chlorophyll <- PHYTO * ChlNratio
+    
+    return(list(c(dDIN, dPHYTO, dZOO, dDET, dDOX, dBOT_DET),
+                TotalN = TotalN, 
+                Chlorophyll = Chlorophyll,
+                AirSeaExchange = AirSeaExchange,
+                Satox = Satox,
+                OxDIFF = OxDIFF,
+                DOXSat = DOXSat,
+                Temperature = Temperature,
+                Wind = Wind,
+                PAR = PAR,
+                SinkDet = SinkDet,
+                SinkPhy = SinkPhy,
+                BotMin = BotMin))
+  })
+}
+
+# Run model
+NYEARS <- 1
+dt <- 1
+times <- seq(from = 0, to = NYEARS*365, by = dt)
+
+# Solve the model
+P <- ode(y = States,
+         times = times,
+         func = NPZDO2,
+         parms = Parms)
+
+# Convert to data frame for plotting
+P_df <- as.data.frame(P)
+P_df$time <- times
+P_long <- pivot_longer(
+  P_df,
+  cols = -time,
+  names_to = "Variable",
+  values_to = "Value"
+)
+
+# Create plots
+# Main plot with all variables
+ggplot(P_long, aes(x = time, y = Value)) +
+  geom_line(aes(color = Variable)) +
+  facet_wrap(~Variable, scales = "free_y", ncol = 4) +
+  scale_color_manual(values = rainbow(length(unique(P_long$Variable)))) +
+  ggtitle("Model Parameters vs Time") +
+  xlab("Time (days)") +
+  ylab("Value") +
+  theme_minimal() +
+  theme(
+    strip.text = element_text(size = 10),
+    axis.text.x = element_text(angle = 90, hjust = 1),
+    panel.grid.major = element_line(color = "gray90"),
+    panel.background = element_rect(fill = "white"),
+    legend.position = "none"
+  )
+
+# Plot comparing oxygen data with model
+oxygen_data <- data.frame(
+  Time = c(times, data.oxygen[, 2]),
+  Oxygen = c(P[, "DOX"], 1000 * data.oxygen[, 3]),
+  Type = c(rep("model", length(times)), rep("data", nrow(data.oxygen)))
+)
+
+ggplot(oxygen_data, aes(x = Time, y = Oxygen, color = Type)) +
+  geom_line(data = subset(oxygen_data, Type == "model"), linewidth = 0.75) +
+  geom_point(data = subset(oxygen_data, Type == "data"), size = 0.5) +
+  labs(
+    title = "Oxygen in mmol O2/m3",
+    x = "Days",
+    y = "Oxygen, mmol O2/m3"
+  ) +
+  scale_color_manual(values=c("model"="black", "data"="red")) +
+  scale_y_continuous(limits = c(180, 300)) +
+  theme_minimal() +
+  theme(
+    legend.position = "right",
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 1)
+  )
+# Wybierz zmienne związane z osadami dennymi i podstawowymi procesami
+variables_to_plot <- c("BOT_DET", "DIN", "PHYTO", "ZOO", "DET", "DOX")
+
+# Przygotuj dane do wykresu
+plot_data <- P_long[P_long$Variable %in% variables_to_plot,]
+
+# Stwórz wykres
+ggplot(plot_data, aes(x = time, y = Value, color = Variable)) +
+  geom_line(linewidth = 0.75) +
+  facet_wrap(~Variable, scales = "free_y", ncol = 2) +
+  labs(
+    title = "DIPN2PZD2O2 Model - Bottom Sediments Impact",
+    x = "Time (days)",
+    y = "Value"
+  ) +
+  theme_minimal() +
+  theme(
+    strip.text = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 10),
+    panel.grid.major = element_line(color = "gray90"),
+    panel.background = element_rect(fill = "white"),
+    legend.position = "right"
+  )
+
+#####################################
+### TASK 13:  ### Stephanie
+#####################################
+# Sprawdź obecny katalog roboczy
+getwd()
+
+# Ustaw katalog roboczy
+setwd("C:/Users/kamil_laptop/Desktop/NPZDO2")
+
+# Load required packages
+require(deSolve)
+require(marelac)
+require(diagram)
+require(FME)
+require(ggplot2)
+require(tidyr)
+
+# Model Parameters
+Parms <- c(
+  depth = as.numeric(5),        # [m] depth of the bay
+  arrheniusCt = 1.07,     # Temperature Dependency of Process rates 
+  
+  # Physical parameters                                                
+  salinity = 34,     # -
+  TempTrend = 0.,    # Temperature estimated trend
+  
+  # Phytoplankton
+  maxUptake = 1.,    # [/day] Maximum uptake rate 
+  ksPAR = 55.,       # [W/m2] half-saturation coefficient for light
+  ksDIN = 1.0,       # [mmolN/m3] half-saturation coefficient for nutrient
+  kd = 0.1,          # /m Light extinction coefficient
+  ChlNratio = 1,     # mgChla/mmolN
+  RespFrac = 0.3,    # Fraction of the uptake that is respired
+  mortalityRatePHYTO = 0.05, # Natural lysis of phytoplankton 
+  
+  # Zooplankton
+  maxGrazing = 1.0,  # [/day] Maximum Grazing rate
+  ksGrazing = 1.0,   # [mmolN/m3] half-saturation coefficient for nutrient
+  pFaeces = 0.3,     # [-]
+  excretionRate = 0.1, # [/day]
+  mortalityRateZOO = 0.4, # [/(mmolN/m3)/day]
+  
+  # Remineralization 
+  mineralisationRate = 0.1, # [/day]
+  ONratio = 0.16,    # molO2/molN, Oxygen to nitrogen ratio of organic matter
+  
+  # River inputs and dilution
+  DilRate = 0.05,    # Dilution rate /day
+  DET_River = 10,    # Concentration of detritus in rivers mmolN/m3
+  DIN_River = 10     # Concentration of DIN in rivers mmolN/m3
+)
+
+# State Variables
+States <- c(
+  DIN = 2.5,     # mmolN/m3 initial concentration of dissolved inorganic nitrogen  
+  PHYTO = 0.05,  # mmolN/m3 initial phytoplankton biomass  
+  ZOO = 0.03,    # mmolN/m3 initial zooplankton biomass 
+  DET = 0.5,     # mmolN/m3 initial detritus concentration
+  DOX = 240      # mmolO2/m3 initial oxygen concentration
+)
+
+# Read forcing data
+data.temperature <- read.table(file = "C:/Users/kamil_laptop/Desktop/NPZDO2/Forcings/Temperature_DailyAveraged.txt", skip=1, header=TRUE)  
+data.light <- read.table(file = "C:/Users/kamil_laptop/Desktop/NPZDO2/Forcings/SolarRadiation_DailyAveraged.txt", skip=1, header=TRUE)  
+data.wind <- read.table(file = "C:/Users/kamil_laptop/Desktop/NPZDO2/Forcings/Wind_MeteoStation.txt", skip=1, header=TRUE) 
+
+# Create forcing functions
+ftemperature <- approxfun(x = data.temperature[,2], y = data.temperature[,3], rule = 2)
+flight <- approxfun(x = data.light[,2], y = data.light[,3], rule = 2)
+Day <- trunc(data.wind[,2])
+Wind <- tapply(data.wind[,3], INDEX=Day, FUN=mean)
+fwind <- approxfun(x=0:365, y=Wind, rule=2)
+
+# Read observation data
+data.oxygen <- read.table(file = "C:/Users/kamil_laptop/Desktop/NPZDO2/Data/Oxygen_DailyAveraged.txt", skip=1, header=TRUE)
+
+# Model function
+NPZDO2 <- function(t, y, parms) {
+  with(as.list(c(y, parms)), {
+    
+    # Initialization
+    Light <- flight(t)
+    Wind <- fwind(t)
+    Temperature <- ftemperature(t) + TempTrend
+    Salinity <- salinity
+    
+    # Light calculations
+    PAR <- 0.5 * Light * exp(-kd*as.numeric(depth))
+    
+    # Temperature effect
+    Tempfac <- arrheniusCt ^ (Temperature-18.)
+    
+    # Biological rates
+    DINuptake <- Tempfac * maxUptake * PAR/(PAR+ksPAR) * DIN/(DIN+ksDIN) * PHYTO
+    Grazing <- Tempfac * maxGrazing * PHYTO/(PHYTO+ksGrazing) * ZOO
+    Faeces <- pFaeces * Grazing
+    ZooGrowth <- (1-pFaeces) * Grazing
+    Excretion <- Tempfac * excretionRate * ZOO
+    MortalityZOO <- Tempfac * mortalityRateZOO * ZOO * ZOO
+    MortalityPHYTO <- Tempfac * mortalityRatePHYTO * PHYTO
+    Mineralisation <- Tempfac * mineralisationRate * DET
+    
+    # Oxygen dynamics
+    Respiration <- (Mineralisation + Excretion + DINuptake * RespFrac) * ONratio
+    GrossPhotosynthesis <- DINuptake * ONratio
+    NetO2Prod <- GrossPhotosynthesis - Respiration
+    
+    # Air-sea exchange
+    Piston <- gas_transfer(t = Temperature, u10 = Wind, species = "O2") * 86400
+    Satox <- gas_O2sat(S = Salinity, t = Temperature) / molweight("O2") * 1000
+    AirSeaExchange <- Piston * (Satox - DOX)
+    DOXSat <- DOX/Satox * 100
+    OxDIFF <- Satox - DOX
+    
+    # River inputs
+    RiverDIN <- DilRate * DIN_River
+    RiverDET <- DilRate * DET_River
+    
+    # Mass balances with river inputs and dilution
+    dDIN <- Mineralisation + Excretion - DINuptake + RiverDIN - DilRate*DIN
+    dPHYTO <- DINuptake - Grazing - MortalityPHYTO - DilRate*PHYTO
+    dZOO <- ZooGrowth - Excretion - MortalityZOO - DilRate*ZOO
+    dDET <- MortalityZOO + MortalityPHYTO - Mineralisation + Faeces + RiverDET - DilRate*DET
+    dDOX <- NetO2Prod + AirSeaExchange/depth
+    
+    # Total nitrogen and chlorophyll
+    TotalN <- DIN + PHYTO + ZOO + DET
+    Chlorophyll <- PHYTO * ChlNratio
+    
+    return(list(c(dDIN, dPHYTO, dZOO, dDET, dDOX),
+                TotalN = TotalN, 
+                Chlorophyll = Chlorophyll,
+                AirSeaExchange = AirSeaExchange,
+                Satox = Satox,
+                OxDIFF = OxDIFF,
+                DOXSat = DOXSat,
+                Temperature = Temperature,
+                Wind = Wind,
+                PAR = PAR))
+  })
+}
+
+# Run model
+NYEARS <- 1
+dt <- 1
+times <- seq(from = 0, to = NYEARS*365, by = dt)
+
+# Solve the model
+P <- ode(y = States,
+         times = times,
+         func = NPZDO2,
+         parms = Parms)
+
+# Convert to data frame for plotting
+P_df <- as.data.frame(P)
+P_df$time <- times
+P_long <- pivot_longer(
+  P_df,
+  cols = -time,
+  names_to = "Variable",
+  values_to = "Value"
+)
+
+# Utwórz folder na wykresy jeśli nie istnieje
+dir.create("plots", showWarnings = FALSE)
+
+# Przygotuj pierwszy wykres: zmienne modelu
+variables_to_plot <- c("DIN", "PHYTO", "ZOO", "DET", "DOX", "TotalN")
+plot_data <- P_long[P_long$Variable %in% variables_to_plot,]
+
+p1 <- ggplot(plot_data, aes(x = time, y = Value, color = Variable)) +
+  geom_line(linewidth = 0.75) +
+  facet_wrap(~Variable, scales = "free_y", ncol = 2) +
+  labs(
+    title = "NPZDO2 Model with River Inputs",
+    x = "Time (days)",
+    y = "Value"
+  ) +
+  theme_minimal() +
+  theme(
+    strip.text = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 10),
+    panel.grid.major = element_line(color = "gray90"),
+    panel.background = element_rect(fill = "white"),
+    legend.position = "right"
+  )
+
+# Przygotuj drugi wykres: porównanie tlenu
+oxygen_data <- data.frame(
+  Time = c(times, data.oxygen[, 2]),
+  Oxygen = c(P[, "DOX"], 1000 * data.oxygen[, 3]),
+  Type = c(rep("model", length(times)), rep("data", nrow(data.oxygen)))
+)
+
+p2 <- ggplot(oxygen_data, aes(x = Time, y = Oxygen, color = Type)) +
+  geom_line(data = subset(oxygen_data, Type == "model"), linewidth = 0.75) +
+  geom_point(data = subset(oxygen_data, Type == "data"), size = 0.5) +
+  labs(
+    title = "Oxygen in mmol O2/m3 with River Inputs",
+    x = "Days",
+    y = "Oxygen, mmol O2/m3"
+  ) +
+  scale_color_manual(values=c("model"="black", "data"="red")) +
+  theme_minimal() +
+  theme(
+    legend.position = "right",
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.text = element_text(size = 10),
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 1)
+  )
+
+# Zapisz oba wykresy w jednym pliku PDF
+pdf("plots/combined_plots.pdf", width = 12, height = 16)
+print(p1)
+print(p2)
+dev.off()
+
+```
