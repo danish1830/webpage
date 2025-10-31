@@ -158,14 +158,15 @@ footer{ margin-top:40px; padding:24px 0; border-top:1px solid var(--line); color
   text-shadow:0 12px 36px rgba(0,0,0,.45);
 }
 .site-subtitle {
-  font-size: clamp(28px, 3.5vw, 52px); /* 🔹 larger name */
-  font-weight: 700;
+  margin: 14px 0 0;
+  font-size: clamp(34px, 4vw, 68px); /* 🔹 Bigger + scales smoothly */
+  font-weight: 800;
   color: #ffffff;
   text-shadow: 0 6px 28px rgba(0, 0, 0, 0.45);
-  margin-top: 10px;
+  letter-spacing: 0.5px; /* adds subtle spacing */
 }
 .site-subsubtitle {
-  font-size: clamp(18px, 2vw, 28px);
+  font-size: clamp(20px, 2.4vw, 34px);
   font-weight: 500;
   color: rgba(255, 255, 255, 0.9);
   text-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
