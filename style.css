@@ -122,6 +122,7 @@ ul{ margin:0; padding-left:18px; }
 footer{ margin-top:40px; padding:24px 0; border-top:1px solid var(--line); color:var(--muted); text-align:center }
 
 /* ===== Hero cover ===== */
+/* === FIX HERO TEXT VERTICAL ALIGNMENT === */
 .hero-cover {
   position: relative;
   width: 100%;
@@ -129,91 +130,57 @@ footer{ margin-top:40px; padding:24px 0; border-top:1px solid var(--line); color
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: center; /* ✅ ensures vertical centering */
   text-align: center;
+  padding-top: 60px; /* ✅ adds breathing space below the topbar */
   margin-bottom: 64px;
 
-  /* Layered gradient over image */
   background:
     linear-gradient(
       rgba(0, 0, 0, 0.45),
       rgba(0, 0, 0, 0.25)
     ),
     url("Images/bg3.jpg") center / cover no-repeat;
-
-  background-attachment: fixed; /* 👈 makes it scroll slower than page (parallax) */
+  background-attachment: fixed;
   background-position: center;
   background-size: cover;
   transition: background-position 0.2s ease-out;
 }
 
+/* --- MOBILE ONLY --- */
+@media (max-width: 768px) {
+  .hero-cover {
+    min-height: 80vh;
+    justify-content: flex-start; /* ✅ stops pushing it up */
+    padding-top: 120px; /* ✅ move text lower on phone */
+    padding-bottom: 40px;
+  }
+}
+
+
 .hero-inner{ position:relative; z-index:1; padding-inline:16px; }
-/* ===== HERO TEXT STYLES ===== */
-.site-title {
-  margin: 0;
-  font-weight: 800;
-  font-size: clamp(50px, 7vw, 100px); /* ✅ scales perfectly desktop→tablet */
-  line-height: 1.05;
-  color: #F59E0B; /* warm amber – readable on all modes */
-  text-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+.site-title{
+  margin:0;
+  font-weight:800;
+  font-size:clamp(44px,8vw,96px);
+  line-height:1.05;
+  color:#fff;
+  text-shadow:0 12px 36px rgba(0,0,0,.45);
 }
 .site-subtitle {
-  margin-top: 14px;
-  font-size: clamp(30px, 3.5vw, 64px); /* ✅ smaller on phones */
+  margin: 14px 0 0;
+  font-size: clamp(34px, 4vw, 68px); /* 🔹 Bigger + scales smoothly */
   font-weight: 800;
   color: #ffffff;
   text-shadow: 0 6px 28px rgba(0, 0, 0, 0.45);
-  letter-spacing: 0.5px;
+  letter-spacing: 0.5px; /* adds subtle spacing */
 }
 .site-subsubtitle {
-  font-size: clamp(18px, 2.4vw, 30px);
+  font-size: clamp(20px, 2.4vw, 34px);
   font-weight: 500;
   color: rgba(255, 255, 255, 0.9);
   text-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
   margin-top: 6px;
-}
-
-/* ===== MOBILE REFINEMENTS (≤768px) ===== */
-@media (max-width: 768px) {
-  .hero-cover {
-    min-height: 75vh;
-    background-attachment: scroll;
-    background-position: center center;
-    padding: 0 12px;
-  }
-  .site-title {
-    font-size: clamp(36px, 8vw, 56px); /* ✅ reduces big title on phones */
-    line-height: 1.1;
-  }
-  .site-subtitle {
-    font-size: clamp(24px, 5vw, 40px);
-    margin-top: 10px;
-  }
-  .site-subsubtitle {
-    font-size: clamp(16px, 3.8vw, 24px);
-  }
-  .hero-topbar {
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-  }
-  .hero-topbar .actions {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-}
-
-/* ===== SMALL PHONES (≤480px) ===== */
-@media (max-width: 480px) {
-  .site-title {
-    font-size: clamp(32px, 9vw, 48px);
-  }
-  .site-subtitle {
-    font-size: clamp(20px, 5vw, 32px);
-  }
-  .site-subsubtitle {
-    font-size: clamp(14px, 4vw, 22px);
-  }
 }
 
 /* Hero top bar (links + buttons) */
