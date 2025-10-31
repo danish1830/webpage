@@ -147,17 +147,6 @@ footer{ margin-top:40px; padding:24px 0; border-top:1px solid var(--line); color
   transition: background-position 0.2s ease-out;
 }
 
-/* --- MOBILE ONLY --- */
-@media (max-width: 768px) {
-  .hero-cover {
-    min-height: 80vh;
-    justify-content: flex-start; /* ✅ stops pushing it up */
-    padding-top: 120px; /* ✅ move text lower on phone */
-    padding-bottom: 40px;
-  }
-}
-
-
 .hero-inner{ position:relative; z-index:1; padding-inline:16px; }
 .site-title{
   margin:0;
