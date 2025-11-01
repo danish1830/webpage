@@ -156,6 +156,23 @@ footer{ margin-top:40px; padding:24px 0; border-top:1px solid var(--line); color
   color:#fff;
   text-shadow:0 12px 36px rgba(0,0,0,.45);
 }
+/* === Hero subtitle styles (Name + Role) === */
+.site-subtitle {
+  margin-top: 12px;
+  font-size: clamp(32px, 5vw, 56px); /* 🔹 balanced across desktop & mobile */
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 6px 28px rgba(0, 0, 0, 0.45);
+  letter-spacing: 0.3px;
+}
+
+.site-subsubtitle {
+  font-size: clamp(20px, 2.8vw, 30px); /* 🔹 smaller tagline */
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  margin-top: 6px;
+}
 
 /* Hero top bar (links + buttons) */
 .hero-topbar{
