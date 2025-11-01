@@ -148,13 +148,13 @@ footer{ margin-top:40px; padding:24px 0; border-top:1px solid var(--line); color
 }
 
 .hero-inner{ position:relative; z-index:1; padding-inline:16px; }
-.site-title{
-  margin:0;
-  font-weight:800;
-  font-size:clamp(44px,8vw,96px);
-  line-height:1.05;
-  color:#fff;
-  text-shadow:0 12px 36px rgba(0,0,0,.45);
+.site-title {
+  margin: 0;
+  font-weight: 800;
+  font-size: clamp(40px, 7vw, 84px); /* ↓ reduced slightly */
+  line-height: 1.05;
+  color: #fff;
+  text-shadow: 0 12px 36px rgba(0,0,0,.45);
 }
 /* === Hero subtitle styles (Name + Role) === */
 .site-subtitle {
