@@ -177,12 +177,6 @@ footer{ margin-top:40px; padding:24px 0; border-top:1px solid var(--line); color
 /* ------------------------------------------------
 
 /* --- Ensure hero title hierarchy is not overridden by global h1/h2/h3 --- */
-.hero-cover .site-title,
-.hero-cover .site-subtitle,
-.hero-cover .site-subsubtitle {
-  all: unset; /* resets global h1/h2/h3 rules */
-  display: block;
-}
 
 /* Reapply intended hero heading styles */
 .hero-cover .site-title {
